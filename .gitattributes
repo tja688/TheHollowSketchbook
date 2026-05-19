@@ -1,37 +1,59 @@
-# Images
-*.png filter=lfs diff=lfs merge=lfs -text
+# ===== 1. 通用文本 / 小文件设置 =====
+* text=auto
+
+# Unity YAML 类文件（小、可合并）
+*.cs diff=csharp text
+*.cginc text
+*.shader text
+
+*.mat merge=unityyamlmerge eol=lf
+*.anim merge=unityyamlmerge eol=lf
+*.unity merge=unityyamlmerge eol=lf
+*.prefab merge=unityyamlmerge eol=lf
+*.physicsMaterial2D merge=unityyamlmerge eol=lf
+*.physicMaterial merge=unityyamlmerge eol=lf
+*.asset merge=unityyamlmerge eol=lf
+*.meta merge=unityyamlmerge eol=lf
+*.controller merge=unityyamlmerge eol=lf
+
+# ===== 2. Git LFS 管理的大文件 =====
+# 图片
 *.jpg filter=lfs diff=lfs merge=lfs -text
 *.jpeg filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
 *.gif filter=lfs diff=lfs merge=lfs -text
 *.psd filter=lfs diff=lfs merge=lfs -text
+*.ai filter=lfs diff=lfs merge=lfs -text
 *.tga filter=lfs diff=lfs merge=lfs -text
-*.tif filter=lfs diff=lfs merge=lfs -text
-*.tiff filter=lfs diff=lfs merge=lfs -text
 *.bmp filter=lfs diff=lfs merge=lfs -text
 *.exr filter=lfs diff=lfs merge=lfs -text
 *.hdr filter=lfs diff=lfs merge=lfs -text
 *.ico filter=lfs diff=lfs merge=lfs -text
 
-# Audio
+# 音频
 *.mp3 filter=lfs diff=lfs merge=lfs -text
 *.wav filter=lfs diff=lfs merge=lfs -text
 *.ogg filter=lfs diff=lfs merge=lfs -text
+*.aif filter=lfs diff=lfs merge=lfs -text
 *.aiff filter=lfs diff=lfs merge=lfs -text
 *.flac filter=lfs diff=lfs merge=lfs -text
 *.m4a filter=lfs diff=lfs merge=lfs -text
 *.wma filter=lfs diff=lfs merge=lfs -text
 
-# Video
+# 视频
 *.mp4 filter=lfs diff=lfs merge=lfs -text
 *.mov filter=lfs diff=lfs merge=lfs -text
 *.avi filter=lfs diff=lfs merge=lfs -text
+*.mpg filter=lfs diff=lfs merge=lfs -text
+*.mpeg filter=lfs diff=lfs merge=lfs -text
 *.mkv filter=lfs diff=lfs merge=lfs -text
 *.wmv filter=lfs diff=lfs merge=lfs -text
 
-# 3D Models
+# 3D 模型
+*.FBX filter=lfs diff=lfs merge=lfs -text
 *.fbx filter=lfs diff=lfs merge=lfs -text
-*.obj filter=lfs diff=lfs merge=lfs -text
 *.blend filter=lfs diff=lfs merge=lfs -text
+*.obj filter=lfs diff=lfs merge=lfs -text
 *.ma filter=lfs diff=lfs merge=lfs -text
 *.mb filter=lfs diff=lfs merge=lfs -text
 *.max filter=lfs diff=lfs merge=lfs -text
@@ -41,43 +63,38 @@
 *.glb filter=lfs diff=lfs merge=lfs -text
 *.gltf filter=lfs diff=lfs merge=lfs -text
 
-# Unity Assets
-*.unitypackage filter=lfs diff=lfs merge=lfs -text
-*.asset filter=lfs diff=lfs merge=lfs -text
-*.prefab filter=lfs diff=lfs merge=lfs -text
-*.mat filter=lfs diff=lfs merge=lfs -text
-*.controller filter=lfs diff=lfs merge=lfs -text
-*.anim filter=lfs diff=lfs merge=lfs -text
-*.overrideController filter=lfs diff=lfs merge=lfs -text
-*.mask filter=lfs diff=lfs merge=lfs -text
-*.asmdef filter=lfs diff=lfs merge=lfs -text
-*.asmref filter=lfs diff=lfs merge=lfs -text
-
-# Fonts
+# 字体
 *.ttf filter=lfs diff=lfs merge=lfs -text
 *.otf filter=lfs diff=lfs merge=lfs -text
 *.woff filter=lfs diff=lfs merge=lfs -text
 *.woff2 filter=lfs diff=lfs merge=lfs -text
 
-# Archives
+# 其他常见二进制大文件
+*.pdf filter=lfs diff=lfs merge=lfs -text
 *.zip filter=lfs diff=lfs merge=lfs -text
-*.rar filter=lfs diff=lfs merge=lfs -text
 *.7z filter=lfs diff=lfs merge=lfs -text
+*.rar filter=lfs diff=lfs merge=lfs -text
 *.tar filter=lfs diff=lfs merge=lfs -text
 *.gz filter=lfs diff=lfs merge=lfs -text
+*.dll filter=lfs diff=lfs merge=lfs -text
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+*.bundle filter=lfs diff=lfs merge=lfs -text
+*.exe filter=lfs diff=lfs merge=lfs -text
+*.so filter=lfs diff=lfs merge=lfs -text
+*.dylib filter=lfs diff=lfs merge=lfs -text
+*.app filter=lfs diff=lfs merge=lfs -text
 
-# Documents
-*.pdf filter=lfs diff=lfs merge=lfs -text
+# Unity 特定
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+*.overrideController filter=lfs diff=lfs merge=lfs -text
+*.mask filter=lfs diff=lfs merge=lfs -text
+*.asmdef filter=lfs diff=lfs merge=lfs -text
+*.asmref filter=lfs diff=lfs merge=lfs -text
+
+# 文档
 *.doc filter=lfs diff=lfs merge=lfs -text
 *.docx filter=lfs diff=lfs merge=lfs -text
 *.xls filter=lfs diff=lfs merge=lfs -text
 *.xlsx filter=lfs diff=lfs merge=lfs -text
 *.ppt filter=lfs diff=lfs merge=lfs -text
 *.pptx filter=lfs diff=lfs merge=lfs -text
-
-# Other binary files
-*.dll filter=lfs diff=lfs merge=lfs -text
-*.so filter=lfs diff=lfs merge=lfs -text
-*.dylib filter=lfs diff=lfs merge=lfs -text
-*.exe filter=lfs diff=lfs merge=lfs -text
-*.app filter=lfs diff=lfs merge=lfs -text
