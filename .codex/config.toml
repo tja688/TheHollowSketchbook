@@ -1,0 +1,10 @@
+[mcp_servers.ai-game-developer]
+"authorization = required",
+"client-transport = stdio",
+"plugin-timeout = 10000",
+"port = 23950",
+"token = TKFSYtABuJYljXLJNyVvyx86Tt-S3SfuRrF0vZuaP9c",
+args = ["port=23950","plugin-timeout=10000","client-transport=stdio","authorization=required","token=TKFSYtABuJYljXLJNyVvyx86Tt-S3SfuRrF0vZuaP9c"]
+command = "C:/Users/jinji/Documents/GitHub/TheHollowSketchbook/Library/mcp-server/win-x64/unity-mcp-server.exe"
+enabled = true
+tool_timeout_sec = 300
