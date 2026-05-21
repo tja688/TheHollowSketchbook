@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779261693245
-updatedAt: 1779281431978
+updatedAt: 1779345461599
 ---
 
 # rat-paper-cutout-prototype
 
 ## Summary
-TA prototype setup for the rat paper-cutout visual test, A/B paper deformation comparisons, and manual-Alpha hard-cardboard cutout prefab workflow in SampleScene.
+TA prototype setup for the rat paper-cutout visual test, A/B paper deformation comparisons, manual-Alpha hard-cardboard cutout prefab workflow in SampleScene, and PolygonFantasyHeroCharacters URP material/shader repair notes.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -40,4 +40,6 @@ TA prototype setup for the rat paper-cutout visual test, A/B paper deformation c
 - Manual Alpha mode requires `Assets/tests/Pictures/Monsters/硬纸板老鼠.png` to contain transparent pixels; there is no automatic rough crop fallback in the generator now.
 - Generated hard-cardboard outputs live under `Assets/CardboardCutout/Generated/`: `Meshes/Rat_Cardboard.asset`, `Materials/Rat_Cardboard_Front.mat`, `Materials/Rat_Cardboard_Back.mat`, `Materials/Rat_Cardboard_Edge.mat`, `Textures/Cardboard_Edge_Repeat.png`, `Textures/Rat_Cardboard_CutMask.png`, and `Prefabs/Rat_Cardboard.prefab`.
 - Rebuild hard-cardboard via Unity menu `Tools/Cardboard Cutout/Build Rat Cardboard Cutout`; it replaces the scene instance named `Cardboard_Rat_Generated` and adjusts camera/light for inspection.
+- Imported fantasy hero asset root: `Assets/PolygonFantasyHeroCharacters/`. In URP project, `Assets/PolygonFantasyHeroCharacters/Shaders/POLYGON_CustomCharacters.shader` was converted from built-in surface shader to a URP-compatible custom shader named `SyntyStudios/CustomCharacter`.
+- Fantasy hero material repair status: 21 custom materials under `Assets/PolygonFantasyHeroCharacters/Materials/CustomMaterials/` plus `Assets/PolygonFantasyHeroCharacters/Materials/FantasyHero.mat` use `SyntyStudios/CustomCharacter`; 12 StandardMaterials under `Assets/PolygonFantasyHeroCharacters/Materials/StandardMaterials/` use `Universal Render Pipeline/Lit`.
 <!-- locus:body:end -->
