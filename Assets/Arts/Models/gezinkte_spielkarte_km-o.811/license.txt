@@ -1,0 +1,11 @@
+Model Information:
+* title:	gezinkte Spielkarte KM-O.811
+* source:	https://sketchfab.com/3d-models/gezinkte-spielkarte-km-o811-986967509d8d4774b87c6f4acc53a5ab
+* author:	Thomas Flynn (https://sketchfab.com/nebulousflynn)
+
+Model License:
+* license type:	CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)
+* requirements:	Author must be credited. No commercial use. Modified versions must have the same license.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "gezinkte Spielkarte KM-O.811" (https://sketchfab.com/3d-models/gezinkte-spielkarte-km-o811-986967509d8d4774b87c6f4acc53a5ab) by Thomas Flynn (https://sketchfab.com/nebulousflynn) licensed under CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)
