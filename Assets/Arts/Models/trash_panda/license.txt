@@ -1,0 +1,11 @@
+Model Information:
+* title:	Trash Panda
+* source:	https://sketchfab.com/3d-models/trash-panda-1f56b5c94ae84c9c8bae2715d6711245
+* author:	b0ssk (https://sketchfab.com/b0ssk)
+
+Model License:
+* license type:	CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)
+* requirements:	Author must be credited. No commercial use. Modified versions must have the same license.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Trash Panda" (https://sketchfab.com/3d-models/trash-panda-1f56b5c94ae84c9c8bae2715d6711245) by b0ssk (https://sketchfab.com/b0ssk) licensed under CC-BY-NC-SA-4.0 (http://creativecommons.org/licenses/by-nc-sa/4.0/)

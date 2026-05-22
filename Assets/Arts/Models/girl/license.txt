@@ -1,0 +1,11 @@
+Model Information:
+* title:	Girl
+* source:	https://sketchfab.com/3d-models/girl-dce86ecd48bc4f5b947fe10f7b82b252
+* author:	Youthful strawbewwy (https://sketchfab.com/Youthful-Strawberry)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Girl" (https://sketchfab.com/3d-models/girl-dce86ecd48bc4f5b947fe10f7b82b252) by Youthful strawbewwy (https://sketchfab.com/Youthful-Strawberry) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
