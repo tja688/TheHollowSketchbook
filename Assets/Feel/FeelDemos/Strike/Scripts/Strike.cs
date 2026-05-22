@@ -33,79 +33,79 @@ namespace MoreMountains.Feel
 	{
 		[Header("Input")]
 		/// a key to use to throw the ball
-		[Tooltip("用于投球的按键")]
+		[Tooltip("a key to use to throw the ball")]
 		public KeyCode ActionKey = KeyCode.Space;
 
 		/// a secondary key to use to throw the ball
-		[Tooltip("用于投球的备用按键")]
+		[Tooltip("a secondary key to use to throw the ball")]
 		public KeyCode ActionKeyAlt = KeyCode.Joystick1Button0;
 
 		[Header("Bindings")]
 		/// the rigidbody of the bowling ball
-		[Tooltip("保龄球的刚体")]
+		[Tooltip("the rigidbody of the bowling ball")]
 		public Rigidbody BowlingBallRb;
 		/// a collider used to count points (still standing pins will overlap with it)
-		[Tooltip("用于计分的 Collider（仍然站立的球瓶会与其重叠）")]
+		[Tooltip("a collider used to count points (still standing pins will overlap with it)")]
 		public Collider PointsCollider;
 		/// the rigidbody of the pins
-		[Tooltip("球瓶的刚体列表")] public List<Rigidbody> Pins;
+		[Tooltip("the rigidbody of the pins")] public List<Rigidbody> Pins;
 		/// the wiggler that makes the launcher rotate
-		[Tooltip("让发射器旋转的摆动器")]
+		[Tooltip("the wiggler that makes the launcher rotate")]
 		public MMWiggle BowlingBallLauncherWiggler;
 		/// the text component used to display the current last score
-		[Tooltip("用于显示最近一次得分的文本组件")]
+		[Tooltip("the text component used to display the current last score")]
 		public Text LastScoreText;
 		/// the text component used to display the total score
-		[Tooltip("用于显示总分的文本组件")]
+		[Tooltip("the text component used to display the total score")]
 		public Text TotalScoreText;
 		/// the text component used to display the number of consecutive strikes
-		[Tooltip("用于显示连续全中次数的文本组件")]
+		[Tooltip("the text component used to display the number of consecutive strikes")]
 		public Text ConsecutiveStrikesText;
 		/// a list of elements to turn on/off in case of strike
-		[Tooltip("全中时要启用或禁用的元素列表")]
+		[Tooltip("a list of elements to turn on/off in case of strike")]
 		public List<GameObject> StrikeElements;
         
 		[Header("Settings")]
 		/// the force to apply when throwing the ball
-		[Tooltip("投球时施加的力度")]
+		[Tooltip("the force to apply when throwing the ball")]
 		public Vector3 ThrowingForce = new Vector3(0, 0, 10f);
 		/// the gravity to apply
-		[Tooltip("要使用的重力")] public Vector3 Gravity = new Vector3(0f, -9.81f, 0f);
+		[Tooltip("the gravity to apply")] public Vector3 Gravity = new Vector3(0f, -9.81f, 0f);
 		/// the max duration before a reset
-		[Tooltip("触发重置前允许经过的最长持续时间")]
+		[Tooltip("the max duration before a reset")]
 		public float MaxDurationBeforeReset = 4f;
 		/// the delay to wait for (in seconds) before resetting the scene
-		[Tooltip("重置场景前要等待的延迟（秒）")]
+		[Tooltip("the delay to wait for (in seconds) before resetting the scene")]
 		public float DelayBeforeReset = 1f;
 		/// the delay to wait for (in seconds) while counting/displaying points
-		[Tooltip("计分和显示分数时要等待的延迟（秒）")]
+		[Tooltip("the delay to wait for (in seconds) while counting/displaying points")]
 		public float DelayForPoints = 1f;
 
 		[Header("Feedbacks")]
 		/// a feedback to call when throwing the ball
-		[Tooltip("投球时要触发的反馈")]
+		[Tooltip("a feedback to call when throwing the ball")]
 		public MMFeedbacks ThrowBallFeedback;
 		/// a feedback to call when resetting the scene
-		[Tooltip("重置场景时要触发的反馈")]
+		[Tooltip("a feedback to call when resetting the scene")]
 		public MMFeedbacks ResetFeedback;
 		/// a feedback played when hitting a strike
-		[Tooltip("打出全中时播放的反馈")]
+		[Tooltip("a feedback played when hitting a strike")]
 		public MMFeedbacks StrikeFeedback;
 		/// a feedback played when missing a strike
-		[Tooltip("未能全中时播放的反馈")]
+		[Tooltip("a feedback played when missing a strike")]
 		public MMFeedbacks NoStrikeFeedback;
 
 		[Header("Scores")]
 		/// the last score you hit
-		[Tooltip("最近一次获得的分数")]
+		[Tooltip("the last score you hit")]
 		[MMReadOnly]
 		public int LastScore = 0;
 		/// The total amount of points since the start
-		[Tooltip("从开始到现在累计获得的总分")]
+		[Tooltip("The total amount of points since the start")]
 		[MMReadOnly]
 		public int TotalPoints = 0;
 		/// the amount of consecutive strikes
-		[Tooltip("连续全中的次数")]
+		[Tooltip("the amount of consecutive strikes")]
 		[MMReadOnly]
 		public int ConsecutiveStrikes = 0;
 

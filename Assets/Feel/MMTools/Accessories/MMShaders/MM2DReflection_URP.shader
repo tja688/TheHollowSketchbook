@@ -38,13 +38,6 @@ Shader "MoreMountains/MM2DReflection_URP"
 		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 		#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Filtering.hlsl"
 
-		#ifndef UNITY_SKINNED_VERTEX_INPUTS
-			#define UNITY_SKINNED_VERTEX_INPUTS
-		#endif
-		#ifndef UNITY_SKINNED_VERTEX_COMPUTE
-			#define UNITY_SKINNED_VERTEX_COMPUTE(input)
-		#endif
-
 		ENDHLSL
 
 
@@ -69,7 +62,6 @@ Shader "MoreMountains/MM2DReflection_URP"
 			#pragma vertex vert
 			#pragma fragment frag
 
-			#pragma multi_compile_instancing
 			#pragma multi_compile _ DEBUG_DISPLAY SKINNED_SPRITE
 
             #define _SURFACE_TYPE_TRANSPARENT 1
@@ -95,6 +87,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
 			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
@@ -177,9 +170,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 				UNITY_SKINNED_VERTEX_COMPUTE( v );
 
-#ifdef UNITY_INSTANCING_ENABLED
-				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteFlip );
-#endif
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
 
 
 				#ifdef ASE_ABSOLUTE_VERTEX_POS
@@ -252,10 +243,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 				}
 				#endif
 
-				Color *= IN.color;
-#ifdef UNITY_INSTANCING_ENABLED
-				Color *= unity_SpriteColor;
-#endif
+				Color *= IN.color * unity_SpriteColor;
 				return Color;
 			}
 
@@ -285,7 +273,6 @@ Shader "MoreMountains/MM2DReflection_URP"
 			#pragma vertex vert
 			#pragma fragment frag
 
-			#pragma multi_compile_instancing
 			#pragma multi_compile _ DEBUG_DISPLAY SKINNED_SPRITE
 
             #define _SURFACE_TYPE_TRANSPARENT 1
@@ -311,6 +298,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
 			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
 
@@ -392,9 +380,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 				UNITY_SKINNED_VERTEX_COMPUTE( v );
 
-#ifdef UNITY_INSTANCING_ENABLED
-				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteFlip );
-#endif
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
 
 
 				#ifdef ASE_ABSOLUTE_VERTEX_POS
@@ -469,10 +455,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 					}
 				#endif
 
-				Color *= IN.color;
-#ifdef UNITY_INSTANCING_ENABLED
-				Color *= unity_SpriteColor;
-#endif
+				Color *= IN.color * unity_SpriteColor;
 				return Color;
 			}
 
@@ -496,7 +479,6 @@ Shader "MoreMountains/MM2DReflection_URP"
 			#pragma vertex vert
 			#pragma fragment frag
 
-			#pragma multi_compile_instancing
 			#pragma multi_compile _ DEBUG_DISPLAY SKINNED_SPRITE
 
             #define _SURFACE_TYPE_TRANSPARENT 1
@@ -518,6 +500,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
 			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
@@ -590,9 +573,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 				UNITY_SKINNED_VERTEX_COMPUTE(v);
 
-#ifdef UNITY_INSTANCING_ENABLED
-				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteFlip );
-#endif
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
 
 				o.ase_texcoord.xy = v.ase_texcoord.xy;
 
@@ -663,7 +644,6 @@ Shader "MoreMountains/MM2DReflection_URP"
 			#pragma vertex vert
 			#pragma fragment frag
 
-			#pragma multi_compile_instancing
 			#pragma multi_compile _ DEBUG_DISPLAY SKINNED_SPRITE
 
             #define _SURFACE_TYPE_TRANSPARENT 1
@@ -685,6 +665,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/TextureStack.hlsl"
 			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRendering.hlsl"
 			#include_with_pragmas "Packages/com.unity.render-pipelines.core/ShaderLibrary/FoveatedRenderingKeywords.hlsl"
+			#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/DebugMipmapStreamingMacros.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ShaderGraphFunctions.hlsl"
 			#include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
 			#include "Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/Includes/ShaderPass.hlsl"
@@ -756,9 +737,7 @@ Shader "MoreMountains/MM2DReflection_URP"
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 				UNITY_SKINNED_VERTEX_COMPUTE(v);
 
-#ifdef UNITY_INSTANCING_ENABLED
-				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteFlip );
-#endif
+				v.positionOS = UnityFlipSprite( v.positionOS, unity_SpriteProps.xy );
 
 				o.ase_texcoord.xy = v.ase_texcoord.xy;
 
