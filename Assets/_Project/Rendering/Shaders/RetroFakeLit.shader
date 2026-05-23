@@ -1,0 +1,146 @@
+Shader "CardDungeon/RetroFakeLit"
+{
+    Properties
+    {
+        _BaseMap ("Base Map", 2D) = "white" {}
+        _BaseColor ("Base Color", Color) = (1,1,1,1)
+        _LightWrap ("Light Wrap", Range(0,1)) = 0
+        _ShadowColor ("Shadow Color", Color) = (0.08,0.065,0.05,1)
+        _AmbientStrength ("Ambient Strength", Range(0,1)) = 0.08
+        _SpecColor ("Spec Color", Color) = (0.28,0.22,0.16,1)
+        _SpecStrength ("Spec Strength", Range(0,1)) = 0.06
+        _SpecPower ("Spec Power", Range(4,96)) = 20
+        _RampSteps ("Ramp Steps", Range(0,8)) = 4
+        _RampStrength ("Ramp Strength", Range(0,1)) = 0.35
+        _FogColor ("Fog Color", Color) = (0.01,0.008,0.006,1)
+        _FogStart ("Fog Start", Float) = 2.0
+        _FogEnd ("Fog End", Float) = 6.0
+        _EmissionMap ("Emission Map", 2D) = "black" {}
+        _EmissionColor ("Emission Color", Color) = (1,0.65,0.35,1)
+        _EmissionStrength ("Emission Strength", Range(0,8)) = 0
+    }
+
+    SubShader
+    {
+        Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Opaque" "Queue"="Geometry" }
+        LOD 200
+        Cull Back
+
+        Pass
+        {
+            Name "ForwardLit"
+            Tags { "LightMode"="UniversalForward" }
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_EmissionMap); SAMPLER(sampler_EmissionMap);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _EmissionMap_ST;
+                half4 _BaseColor;
+                half _LightWrap;
+                half4 _ShadowColor;
+                half _AmbientStrength;
+                half4 _SpecColor;
+                half _SpecStrength;
+                half _SpecPower;
+                half _RampSteps;
+                half _RampStrength;
+                half4 _FogColor;
+                float _FogStart;
+                float _FogEnd;
+                half4 _EmissionColor;
+                half _EmissionStrength;
+            CBUFFER_END
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 positionWS : TEXCOORD0;
+                half3 normalWS : TEXCOORD1;
+                float2 uv : TEXCOORD2;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings output;
+                VertexPositionInputs positionInputs = GetVertexPositionInputs(input.positionOS.xyz);
+                VertexNormalInputs normalInputs = GetVertexNormalInputs(input.normalOS);
+                output.positionCS = positionInputs.positionCS;
+                output.positionWS = positionInputs.positionWS;
+                output.normalWS = normalInputs.normalWS;
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                return output;
+            }
+
+            half QuantizeLight(half value)
+            {
+                half steps = max(_RampSteps, 1.0h);
+                half ramped = floor(value * steps) / max(steps - 1.0h, 1.0h);
+                return lerp(value, saturate(ramped), _RampStrength * step(1.5h, _RampSteps));
+            }
+
+            half3 AccumulateLight(half3 normalWS, float3 positionWS, half3 viewDirWS)
+            {
+                Light mainLight = GetMainLight(TransformWorldToShadowCoord(positionWS));
+                half ndotl = saturate(dot(normalWS, mainLight.direction));
+                half wrapped = saturate(lerp(ndotl, ndotl * 0.5h + 0.5h, _LightWrap));
+                half lit = QuantizeLight(wrapped) * mainLight.shadowAttenuation;
+                half3 color = lerp(_ShadowColor.rgb, mainLight.color, lit);
+
+                half3 halfDir = normalize(mainLight.direction + viewDirWS);
+                half spec = pow(saturate(dot(normalWS, halfDir)), _SpecPower) * _SpecStrength * lit;
+                color += _SpecColor.rgb * spec;
+
+                #if defined(_ADDITIONAL_LIGHTS)
+                uint pixelLightCount = GetAdditionalLightsCount();
+                for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
+                {
+                    Light light = GetAdditionalLight(lightIndex, positionWS);
+                    half addNdotL = saturate(dot(normalWS, light.direction));
+                    half addWrapped = saturate(lerp(addNdotL, addNdotL * 0.5h + 0.5h, _LightWrap));
+                    half addLit = QuantizeLight(addWrapped) * light.distanceAttenuation * light.shadowAttenuation;
+                    color += light.color * addLit;
+                }
+                #endif
+
+                return color + _ShadowColor.rgb * _AmbientStrength;
+            }
+
+            half4 Frag(Varyings input) : SV_Target
+            {
+                half3 normalWS = normalize(input.normalWS);
+                half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
+                half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb * _BaseColor.rgb;
+                half3 lighting = AccumulateLight(normalWS, input.positionWS, viewDirWS);
+                half3 emission = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, TRANSFORM_TEX(input.uv, _EmissionMap)).rgb * _EmissionColor.rgb * _EmissionStrength;
+                half3 color = albedo * lighting + emission;
+
+                float distanceToCamera = distance(GetCameraPositionWS(), input.positionWS);
+                float fog = saturate((distanceToCamera - _FogStart) / max(0.001, _FogEnd - _FogStart));
+                color = lerp(color, _FogColor.rgb, fog);
+                return half4(saturate(color), 1.0h);
+            }
+            ENDHLSL
+        }
+    }
+
+    FallBack "Universal Render Pipeline/Lit"
+}

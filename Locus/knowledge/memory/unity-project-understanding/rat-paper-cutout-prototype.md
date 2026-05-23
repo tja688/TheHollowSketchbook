@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779261693245
-updatedAt: 1779524405993
+updatedAt: 1779547584960
 ---
 
 # rat-paper-cutout-prototype
 
 ## Summary
-TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, PolygonFantasyHeroCharacters URP material repair notes, SampleScene Inscryption-style retro pipeline history, and current `Assets/Tests/render.unity` retro composite/render setup.
+TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, PolygonFantasyHeroCharacters URP material repair notes, SampleScene Inscryption-style retro pipeline history, current `Assets/Tests/render.unity` retro composite/render setup, Phase 05 RetroFakeLit conversion pipeline, and Phase 07 PosterizeWithThreshold setup.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -47,9 +47,12 @@ TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, P
 - `Assets/Tests/render.unity` uses `Assets/Settings/URP-HighFidelity.asset` with render scale 0.5, MSAA disabled, HDR enabled, depth texture enabled, additional lights per object 4, and active renderer `Assets/Settings/URP-HighFidelity-Renderer.asset`.
 - `Assets/Settings/URP-HighFidelity-Renderer.asset` includes SSAO and a FullScreenPassRendererFeature named `CardDungeon Retro Composite`, injected After Rendering Post Processing with Color requirement and using `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat`.
 - Retro full-screen shader lives at `Assets/Shaders/CardDungeon_RetroComposite.shader`; material preset lives at `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat`.
-- The retro shader includes barrel curvature, soft edge mask, horizontal jitter, scanlines, highlight bleed, chromatic aberration, noise, palette/posterization, black crush, and vignette. In `render.unity` the material is set to virtual 640x360, pixelate 0.82, scanline 0.42, chromatic aberration 1.1, vignette 0.72, palette threshold 0.42, palette strength 0.28.
+- The retro shader includes barrel curvature, soft edge mask, horizontal jitter, scanlines, highlight bleed, chromatic aberration, noise, palette/posterization, black crush, and vignette. In `render.unity` the material is set to virtual 960x540, pixelate 1, posterize strength 0.42, palette strength 0.34, black crush 0.10, scanline 0.12, chromatic aberration 0.45, vignette 0.62.
 - `Assets/Tests/render.unity` has no Volume component and `Main Camera` has Render Post Processing disabled, so URP Volume Bloom/Tonemapping/Vignette are not active there; the visible retro look comes from the renderer feature composite rather than camera post-processing.
-- `Assets/Tests/render.unity` currently relies mostly on imported GLTF PBRGraph materials for table/cards/props; only bird eye objects use `Assets/Tests/Render/M_Emission_MonsterEye.mat`, and that material currently has `_EmissionColor` black and `_EMISSION` off.
+- On 2026-05-23, Phase 05 RetroFakeLit lives at `Assets/_Project/Rendering/Shaders/RetroFakeLit.shader`; default `_LightWrap` is 0 because visual review found wrap 0 looks better than wrapped lighting. `Assets/Tests/render.unity` ordinary props/table/bird/statues/chest/candleholder/background characters were converted to generated materials under `Assets/_Project/Rendering/Materials/`. Cards, eye emission spheres, flame/soul emission meshes, light gizmo meshes, and inactive tree test assets were intentionally excluded.
+- The reusable conversion tool is `Assets/_Project/Scripts/RetroFakeLitMaterialConverter.cs` with menu items `Tools/CardDungeon Rendering/Convert Scene Ordinary Objects To RetroFakeLit` and `Tools/CardDungeon Rendering/Convert Selection To RetroFakeLit`. It converts source material base texture/color into generated `M_RetroFakeLit_*` materials, sets `_LightWrap = 0`, and skips obvious cards/lights/eyes for the active scene pipeline.
+- Phase 07 PosterizeWithThreshold was implemented on 2026-05-23 as `Assets/_Project/Rendering/Shaders/RetroPosterizeThreshold.shader`, material `Assets/_Project/Rendering/Materials/M_RetroPosterizeThreshold_Phase07.mat`, and three generated 256x1 LUT assets under `Assets/_Project/Rendering/Textures/PosterizeLUT/`: `T_LUT_DirtyBrown.asset`, `T_LUT_DarkGreen.asset`, `T_LUT_CandleRed.asset`.
+- Phase 07 is active by default in `Assets/Settings/URP-HighFidelity-Renderer.asset` as FullScreenPassRendererFeature `RetroPosterizeThreshold`, ordered after SSAO and before `CardDungeon Retro Composite`, injected After Rendering Post Processing with Color requirement. Default params: `_Threshold=0.50`, `_ThresholdSharpness=12`, `_Contribution=0.85`, `_LutStrength=1`, LUT DirtyBrown, `_CompareDebug=0`, `_DebugMask=0`. Toggle comparison by disabling the `RetroPosterizeThreshold` renderer feature, or set `_CompareDebug=1` / `_DebugMask=1` on the material.
 - `Assets/Settings/SampleSceneProfile.asset` is used by the older `Global Volume` setup in `Assets/Scenes/SampleScene.unity`, not by `Assets/Tests/render.unity` unless a volume is added.
 - Creating TextMeshPro 3D labels caused Unity to import TMP essentials under `Assets/TextMesh Pro/`; keep this if the scene labels or future card text use TextMeshPro.
 <!-- locus:body:end -->
