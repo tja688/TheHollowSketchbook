@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779261693245
-updatedAt: 1779347708946
+updatedAt: 1779524405993
 ---
 
 # rat-paper-cutout-prototype
 
 ## Summary
-TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, PolygonFantasyHeroCharacters URP material repair notes, and SampleScene Inscryption-style retro render pipeline/CRT full-screen filter setup.
+TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, PolygonFantasyHeroCharacters URP material repair notes, SampleScene Inscryption-style retro pipeline history, and current `Assets/Tests/render.unity` retro composite/render setup.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -42,11 +42,14 @@ TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, P
 - Rebuild hard-cardboard via Unity menu `Tools/Cardboard Cutout/Build Rat Cardboard Cutout`; it replaces the scene instance named `Cardboard_Rat_Generated` and adjusts camera/light for inspection.
 - Imported fantasy hero asset root: `Assets/PolygonFantasyHeroCharacters/`. In URP project, `Assets/PolygonFantasyHeroCharacters/Shaders/POLYGON_CustomCharacters.shader` was converted from built-in surface shader to a URP-compatible custom shader named `SyntyStudios/CustomCharacter`.
 - Fantasy hero material repair status: 21 custom materials under `Assets/PolygonFantasyHeroCharacters/Materials/CustomMaterials/` plus `Assets/PolygonFantasyHeroCharacters/Materials/FantasyHero.mat` use `SyntyStudios/CustomCharacter`; 12 StandardMaterials under `Assets/PolygonFantasyHeroCharacters/Materials/StandardMaterials/` use `Universal Render Pipeline/Lit`.
-- Inscryption-style render pipeline validation is now in `Assets/Scenes/SampleScene.unity/Inscryption_RenderPipeline_Validation`: dark table block, black crush room shell, 5 physical multiplier slots, glowing labels/grooves, physical cards, heart candles, soul jar, red eyes, and one placed prefab instance from `Assets/PolygonFantasyHeroCharacters/Prefabs/Characters_Presets/Chr_FantasyHero_Preset_1.prefab` hidden in darkness.
+- Inscryption-style render pipeline validation was previously built in `Assets/Scenes/SampleScene.unity/Inscryption_RenderPipeline_Validation`: dark table block, black crush room shell, 5 physical multiplier slots, glowing labels/grooves, physical cards, heart candles, soul jar, red eyes, and one placed prefab instance from `Assets/PolygonFantasyHeroCharacters/Prefabs/Characters_Presets/Chr_FantasyHero_Preset_1.prefab` hidden in darkness.
+- Current active render validation scene inspected on 2026-05-23 is `Assets/Tests/render.unity`. It contains a table, 3 card mesh instances, a bird with eye objects, dark scene/background meshes, statues/chest/candleholder props, one spot `TableWarmLight`, three point `CandleLight_*`, and a zero-intensity directional light.
+- `Assets/Tests/render.unity` uses `Assets/Settings/URP-HighFidelity.asset` with render scale 0.5, MSAA disabled, HDR enabled, depth texture enabled, additional lights per object 4, and active renderer `Assets/Settings/URP-HighFidelity-Renderer.asset`.
+- `Assets/Settings/URP-HighFidelity-Renderer.asset` includes SSAO and a FullScreenPassRendererFeature named `CardDungeon Retro Composite`, injected After Rendering Post Processing with Color requirement and using `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat`.
 - Retro full-screen shader lives at `Assets/Shaders/CardDungeon_RetroComposite.shader`; material preset lives at `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat`.
-- The retro shader now includes CRT-specific barrel curvature, soft edge mask, horizontal jitter, stronger scanlines, subtle high-light bleed, chromatic aberration, noise, palette/posterization, black crush, and vignette. Tune via material floats `_CrtCurvature`, `_CrtEdgeSoftness`, `_CrtGlowBleed`, `_HorizontalJitter`, `_ScanlineStrength`, `_ChromaticAberration`, and related color controls.
-- Current active URP asset is `Assets/Settings/URP-HighFidelity.asset`; it was adjusted for retro validation: render scale 0.5, point/nearest upscaling enum value 1, MSAA disabled, depth texture enabled, shorter shadow distance, fewer additional lights.
-- `Assets/Settings/URP-HighFidelity-Renderer.asset` includes a FullScreenPassRendererFeature named `CardDungeon Retro Composite`, injected After Rendering Post Processing with Color requirement and using `M_RetroComposite_Inscryption`.
-- `Assets/Settings/SampleSceneProfile.asset` is used by `Global Volume` and now contains Tonemapping, Bloom, Vignette, and ColorAdjustments for the dark low-res validation look.
+- The retro shader includes barrel curvature, soft edge mask, horizontal jitter, scanlines, highlight bleed, chromatic aberration, noise, palette/posterization, black crush, and vignette. In `render.unity` the material is set to virtual 640x360, pixelate 0.82, scanline 0.42, chromatic aberration 1.1, vignette 0.72, palette threshold 0.42, palette strength 0.28.
+- `Assets/Tests/render.unity` has no Volume component and `Main Camera` has Render Post Processing disabled, so URP Volume Bloom/Tonemapping/Vignette are not active there; the visible retro look comes from the renderer feature composite rather than camera post-processing.
+- `Assets/Tests/render.unity` currently relies mostly on imported GLTF PBRGraph materials for table/cards/props; only bird eye objects use `Assets/Tests/Render/M_Emission_MonsterEye.mat`, and that material currently has `_EmissionColor` black and `_EMISSION` off.
+- `Assets/Settings/SampleSceneProfile.asset` is used by the older `Global Volume` setup in `Assets/Scenes/SampleScene.unity`, not by `Assets/Tests/render.unity` unless a volume is added.
 - Creating TextMeshPro 3D labels caused Unity to import TMP essentials under `Assets/TextMesh Pro/`; keep this if the scene labels or future card text use TextMeshPro.
 <!-- locus:body:end -->
