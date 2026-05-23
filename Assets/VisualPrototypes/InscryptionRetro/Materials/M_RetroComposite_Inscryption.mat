@@ -25,26 +25,26 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _BlackCrush: 0.12
-    - _ChromaticAberration: 1.1
-    - _Contrast: 1.36
-    - _CrtCurvature: 0.055
-    - _CrtEdgeSoftness: 0.035
-    - _CrtGlowBleed: 0.38
-    - _DitherStrength: 0.045
-    - _HorizontalJitter: 0.38
-    - _NoiseStrength: 0.055
-    - _PaletteDarkThreshold: 0.42
-    - _PaletteStrength: 0.28
-    - _Pixelate: 0.82
+    - _BlackCrush: 0.1
+    - _ChromaticAberration: 0.45
+    - _Contrast: 1.28
+    - _CrtCurvature: 0.025
+    - _CrtEdgeSoftness: 0.02
+    - _CrtGlowBleed: 0.22
+    - _DitherStrength: 0.03
+    - _HorizontalJitter: 0.08
+    - _NoiseStrength: 0.035
+    - _PaletteDarkThreshold: 0.46
+    - _PaletteStrength: 0.34
+    - _Pixelate: 1
     - _PosterizeLevels: 8
-    - _PosterizeStrength: 0.52
+    - _PosterizeStrength: 0.42
     - _Saturation: 0.92
-    - _ScanlineStrength: 0.42
-    - _VignetteRadius: 0.68
-    - _VignetteStrength: 0.72
-    - _VirtualHeight: 360
-    - _VirtualWidth: 640
+    - _ScanlineStrength: 0.12
+    - _VignetteRadius: 0.72
+    - _VignetteStrength: 0.62
+    - _VirtualHeight: 540
+    - _VirtualWidth: 960
     m_Colors:
     - _ColdTint: {r: 0.1, g: 0.36, b: 0.32, a: 1}
     - _WarmTint: {r: 1.08, g: 0.88, b: 0.62, a: 1}
