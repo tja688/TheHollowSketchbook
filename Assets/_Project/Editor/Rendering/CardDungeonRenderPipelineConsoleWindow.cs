@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UIElements;
 
@@ -49,7 +51,8 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         RenderScale,
         RetroFakeLit,
         Phase07Posterize,
-        RetroComposite
+        RetroComposite,
+        Presets
     }
 
     [SerializeField] private CardDungeonRenderPipelineConsoleConfig config;
@@ -92,19 +95,40 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
     private void EnsureConfig()
     {
         config = AssetDatabase.LoadAssetAtPath<CardDungeonRenderPipelineConsoleConfig>(CardDungeonRenderPipelineConsoleConfig.AssetPath);
-        if (config != null)
+        if (config == null)
         {
-            return;
+            EnsureFolder("Assets/_Project/Editor");
+            EnsureFolder("Assets/_Project/Editor/Rendering");
+
+            config = CreateInstance<CardDungeonRenderPipelineConsoleConfig>();
+            config.name = "CardDungeonRenderPipelineConsoleConfig";
+            config.AutoPopulate();
+            AssetDatabase.CreateAsset(config, CardDungeonRenderPipelineConsoleConfig.AssetPath);
+            AssetDatabase.SaveAssets();
         }
-
-        EnsureFolder("Assets/_Project/Editor");
-        EnsureFolder("Assets/_Project/Editor/Rendering");
-
-        config = CreateInstance<CardDungeonRenderPipelineConsoleConfig>();
-        config.name = "CardDungeonRenderPipelineConsoleConfig";
-        config.AutoPopulate();
-        AssetDatabase.CreateAsset(config, CardDungeonRenderPipelineConsoleConfig.AssetPath);
-        AssetDatabase.SaveAssets();
+        else
+        {
+            // Backfill new fields for existing configs
+            bool dirty = false;
+            if (config.globalVolumeProfile == null)
+            {
+                config.globalVolumeProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/Settings/SampleSceneProfile.asset");
+                dirty = true;
+            }
+            if (config.presets == null)
+            {
+                config.presets = new List<RetroRenderPreset>();
+                dirty = true;
+            }
+            if (RetroRenderPreset.SyncPresetList(config))
+            {
+                dirty = true;
+            }
+            if (dirty)
+            {
+                EditorUtility.SetDirty(config);
+            }
+        }
     }
 
     private VisualElement BuildHeader()
@@ -124,7 +148,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         title.style.color = new Color(0.94f, 0.88f, 0.78f);
         root.Add(title);
 
-        Label subtitle = new Label("统一管理当前已经落地的 URP 基线、RetroFakeLit、Phase 07 暗部阈值 LUT，以及 Retro Composite 全屏风格参数。这里改动会直接写回项目资产。" );
+        Label subtitle = new Label("统一管理当前已经落地的 URP 基线、Phase 09 固定虚拟分辨率、RetroFakeLit、Phase 07 暗部阈值 LUT，以及 Retro Composite 全屏风格参数。这里改动会直接写回项目资产。" );
         subtitle.style.whiteSpace = WhiteSpace.Normal;
         subtitle.style.marginTop = 6;
         subtitle.style.color = new Color(0.78f, 0.72f, 0.66f);
@@ -198,8 +222,9 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         navigationRoot.Add(CreateNavButton(ConsolePage.Overview, "总览", "看当前是哪几层参数在主导画面，先定位问题。"));
         navigationRoot.Add(CreateNavButton(ConsolePage.RenderScale, "低清画布 / URP 基线", "Phase 03 / 09：控制内部画布分辨率、上采样和 URP 基础设置。"));
         navigationRoot.Add(CreateNavButton(ConsolePage.RetroFakeLit, "Phase 05 / RetroFakeLit", "批量调整普通物体假光照材质的共有参数。"));
-        navigationRoot.Add(CreateNavButton(ConsolePage.Phase07Posterize, "Phase 07 / 暗部阈值 LUT", "直接验证屎黄色是不是这层后处理导致的。"));
+        navigationRoot.Add(CreateNavButton(ConsolePage.Phase07Posterize, "Phase 07 / 暗部阈值 LUT", "控制暗部统一染色，保留亮部可读性。"));
         navigationRoot.Add(CreateNavButton(ConsolePage.RetroComposite, "Phase 08 / Retro Composite", "统一管理镜头、颗粒、暗角、量化、冷暖偏色等整体风格。"));
+        navigationRoot.Add(CreateNavButton(ConsolePage.Presets, "预设 / Presets", "一键切换四组官方预设，或保存当前参数为新预设。"));
     }
 
     private Button CreateNavButton(ConsolePage page, string title, string description)
@@ -276,6 +301,9 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
             case ConsolePage.RetroComposite:
                 BuildRetroCompositePage();
                 break;
+            case ConsolePage.Presets:
+                BuildPresetsPage();
+                break;
         }
     }
 
@@ -295,7 +323,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
 
     private void BuildOverviewPage()
     {
-        AddPageTitle("总览", "先看当前到底是哪一层在主导画面。这个页面专门用来快速回答“是不是 07 导致的”这类问题。" );
+        AddPageTitle("总览", "先看当前到底是哪一层在主导画面。这个页面用来快速定位风格来源和切换预设。" );
 
         contentScroll.Add(CreateStatsGrid(new[]
         {
@@ -304,6 +332,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
             CreateStatCard("Phase07 LUT", GetMaterialTextureName(config.retroPosterizeThresholdMaterial, "_UserLut"), "暗部会优先被这张 LUT 染色。"),
             CreateStatCard("Phase07 Contribution", GetMaterialFloat(config.retroPosterizeThresholdMaterial, "_Contribution").ToString("0.00"), "越大，暗部统一风格越强。"),
             CreateStatCard("Composite Palette", GetMaterialFloat(config.retroCompositeMaterial, "_PaletteStrength").ToString("0.00"), "越大，暗部越会被压向固定调色板。"),
+            CreateStatCard("Bloom Intensity", GetBloomFloat("intensity").ToString("0.00"), "发光溢出强度。过高会照亮全场，破坏黑场。"),
             CreateStatCard("RetroFakeLit 材质数", GetRetroFakeLitMaterials().Count.ToString(), "普通物体大部分都会吃这套假光照。"),
         }));
 
@@ -313,41 +342,84 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         float contribution = GetMaterialFloat(config.retroPosterizeThresholdMaterial, "_Contribution");
         float threshold = GetMaterialFloat(config.retroPosterizeThresholdMaterial, "_Threshold");
         float paletteStrength = GetMaterialFloat(config.retroCompositeMaterial, "_PaletteStrength");
+        float bloomIntensity = GetBloomFloat("intensity");
         Color warmTint = GetMaterialColor(config.retroCompositeMaterial, "_WarmTint");
 
         if (posterizeActive && compositeActive && lutName.Contains("DirtyBrown", StringComparison.OrdinalIgnoreCase) && contribution >= 0.75f && threshold >= 0.45f)
         {
             contentScroll.Add(new HelpBox(
-                $"当前 07 和 Composite 都处于强风格工作状态：LUT={lutName}，Contribution={contribution:0.00}，Threshold={threshold:0.00}，Composite PaletteStrength={paletteStrength:0.00}。这套组合非常容易把暗部和中暗部统一成脏棕黄调，尤其 WarmTint 还是 {warmTint}. 如果你现在看到屎黄色，这一层高度可疑。",
+                $"当前 07 和 Composite 都处于强风格工作状态：LUT={lutName}，Contribution={contribution:0.00}，Threshold={threshold:0.00}，Composite PaletteStrength={paletteStrength:0.00}，WarmTint={warmTint}。这套组合会把暗部和中暗部统一成脏棕黄调。",
                 HelpBoxMessageType.Warning));
         }
         else
         {
-            contentScroll.Add(new HelpBox("当前参数没有明显落在“脏棕强染色”最危险区间，但你仍然可以去 Phase 07 页面直接切 LUT、调 Contribution 和 Threshold 做排查。", HelpBoxMessageType.Info));
+            contentScroll.Add(new HelpBox("当前参数没有明显落在强染色区间。如需排查风格来源，建议先关闭各层 Feature 逐一观察。", HelpBoxMessageType.Info));
+        }
+
+        if (bloomIntensity > 0.8f)
+        {
+            contentScroll.Add(new HelpBox(
+                $"当前 Bloom Intensity={bloomIntensity:0.00}，高于参考计划建议值（0.15~0.45）。过高的 Bloom 容易把大面积桌面照亮，破坏黑场氛围。建议去 `预设 / Presets` 页面切换 Clean Debug 或 Combat Readability 预设，或在 Phase 08 页面底部的 Bloom 区手动下调。",
+                HelpBoxMessageType.Warning));
+        }
+
+        // Preset quick apply
+        if (config.presets != null && config.presets.Count > 0)
+        {
+            contentScroll.Add(CreateSectionCard("快速预设", "一键切换整套参数。会同时改写 Phase 07、Phase 08 和 Bloom。", section =>
+            {
+                foreach (var preset in config.presets)
+                {
+                    if (preset == null) continue;
+                    section.Add(new Button(() =>
+                    {
+                        preset.Apply(config.retroPosterizeThresholdMaterial, config.retroCompositeMaterial,
+                            config.highFidelityRenderer, config.globalVolumeProfile,
+                            PosterizeFeatureName, CompositeFeatureName);
+                        RefreshPage();
+                    })
+                    {
+                        text = $"应用预设：{preset.name}"
+                    });
+                }
+            }));
+        }
+        else
+        {
+            contentScroll.Add(new HelpBox("当前没有加载任何预设。请前往 `预设 / Presets` 页面生成默认预设。", HelpBoxMessageType.Info));
         }
 
         contentScroll.Add(CreateSectionCard("当前资产接线", "这里显示控制台正在直接操作哪些资产。后续新的渲染阶段也建议继续接到这张控制表。" , section =>
         {
             section.Add(CreateObjectRow("URP Asset", config.highFidelityPipeline, "当前高保真 URP 资产。改它会影响 render scale、HDR、深度贴图等渲染基线。"));
             section.Add(CreateObjectRow("Renderer Asset", config.highFidelityRenderer, "当前 Forward Renderer。07 和 Composite 的全屏 pass 都挂在这里。"));
-            section.Add(CreateObjectRow("Phase07 材质", config.retroPosterizeThresholdMaterial, "控制暗部阈值 LUT。提高强度会更统一，但更容易发黄发脏。"));
+            section.Add(CreateObjectRow("Phase07 材质", config.retroPosterizeThresholdMaterial, "控制暗部阈值 LUT。"));
             section.Add(CreateObjectRow("Composite 材质", config.retroCompositeMaterial, "控制镜头、量化、颗粒、暗角、冷暖偏色。"));
+            section.Add(CreateObjectRow("Volume Profile", config.globalVolumeProfile, "URP 后处理 Volume，包含 Bloom 等内置效果。"));
             section.Add(CreateObjectRow("RetroFakeLit 材质文件夹", config.retroFakeLitMaterialFolder, "普通物体材质集中在这里。Phase 05 页面会批量写回这些材质。"));
         }));
 
-        contentScroll.Add(CreateSectionCard("快速排查建议", "如果你的目标只是先确认 07 有没有把画面染坏，按下面顺序测，最快。", section =>
+        contentScroll.Add(CreateSectionCard("快速排查建议", "按下面顺序关闭各层，观察画面变化，定位风格主导来源。", section =>
         {
-            section.Add(CreateChecklistLabel("1. 在 `Phase 07 / 暗部阈值 LUT` 页面先关掉 `RetroPosterizeThreshold` Feature，看屎黄色是否立刻减轻。"));
+            section.Add(CreateChecklistLabel("1. 在 `Phase 07 / 暗部阈值 LUT` 页面先关掉 `RetroPosterizeThreshold` Feature，观察暗部染色是否立刻减轻。"));
             section.Add(CreateChecklistLabel("2. 不关 Feature，只把 LUT 从 DirtyBrown 切到 DarkGreen 或 CandleRed，看偏色方向是否同步变化。"));
             section.Add(CreateChecklistLabel("3. 把 Contribution 从 0.85 降到 0.35，再把 Threshold 从 0.50 降到 0.35，看中亮区域是否不再被染色。"));
-            section.Add(CreateChecklistLabel("4. 如果 07 关闭后仍然黄，再去 `Phase 08 / Retro Composite` 降低 WarmTint 和 PaletteStrength。"));
+            section.Add(CreateChecklistLabel("4. 如果 07 关闭后仍有明显偏色，再去 `Phase 08 / Retro Composite` 降低 WarmTint 和 PaletteStrength。"));
+            section.Add(CreateChecklistLabel("5. 如果画面整体过亮、发光物糊成一片，去 `Phase 08 / Retro Composite` 底部的 Bloom 区下调 Intensity 和 Threshold。"));
         }));
     }
 
     private void BuildRenderScalePage()
     {
         AddPageTitle("低清画布 / URP 基线", "这一页对应 Phase 03 和 Phase 09 的基础部分。它不决定“黄不黄”，但决定整个项目到底像旧游戏还是高清 3D。" );
-        contentScroll.Add(new HelpBox("原则：先用 Render Scale 快速验证，再决定以后是否上固定 960×540 RT。数值越低，像素颗粒越明显，也更能掩盖资产瑕疵；但过低会直接吃掉文字和交互可读性。", HelpBoxMessageType.Info));
+        contentScroll.Add(new HelpBox("原则：先用 Render Scale 快速验证，再用固定 960×540 虚拟画布锁死不同显示器下的风格一致性。数值越低，像素颗粒越明显，也更能掩盖资产瑕疵；但过低会直接吃掉文字和交互可读性。", HelpBoxMessageType.Info));
+
+        contentScroll.Add(CreateSectionCard("Phase 09 当前结论", "这次落地不新建运行时 FixedVirtualResolutionController，而是把固定虚拟分辨率收敛为当前 Composite pass 的正式档位与封档说明。当前 `Assets/Tests/render.unity` 主相机没有 Target Texture，也没有运行时坐标映射逻辑，所以这一阶段现在的职责是：把 960×540 作为项目标准虚拟分辨率档，提供一键切档、排查入口和封档结论。", section =>
+        {
+            section.Add(CreateChecklistLabel("当前主档：Composite `Virtual Width/Height = 960×540`。这会把最终采样颗粒固定在统一档位，不再跟显示器分辨率一起漂。"));
+            section.Add(CreateChecklistLabel("当前仍是单相机直接输出到屏幕，不含 Letterbox / Pillarbox，也不含鼠标坐标重映射。因为本次已排除 06 卡牌与后续交互实现，所以不继续扩运行时系统。"));
+            section.Add(CreateChecklistLabel("如需检查一致性，优先看 `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat` 的 `_VirtualWidth/_VirtualHeight/_Pixelate`，再看 `Assets/Settings/URP-HighFidelity.asset` 的 `m_RenderScale`。"));
+        }));
 
         contentScroll.Add(CreateButtonRow(new[]
         {
@@ -360,23 +432,31 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 SetUrpBool("m_RequireOpaqueTexture", false, "Apply Opaque Preset");
                 SetUrpInt("m_AdditionalLightsPerObjectLimit", 4, "Apply Light Limit Preset");
                 SetUrpFloat("m_ShadowDistance", 18f, "Apply Shadow Distance Preset");
+                SetCompositeVirtualResolution(960, 540, 1f);
+                RefreshPage();
+            })),
+            ("锁定 960×540", (Action)(() =>
+            {
+                SetCompositeVirtualResolution(960, 540, 1f);
                 RefreshPage();
             })),
             ("更脏 640×360 倾向", (Action)(() =>
             {
                 SetUrpFloat("m_RenderScale", 0.333f, "Apply Dirty Render Scale");
                 SetUrpInt("m_UpscalingFilter", 2, "Apply Dirty Upscaling");
+                SetCompositeVirtualResolution(640, 360, 1f);
                 RefreshPage();
             })),
-            ("更干净 0.75", (Action)(() =>
+            ("更干净 1280×720", (Action)(() =>
             {
                 SetUrpFloat("m_RenderScale", 0.75f, "Apply Clean Render Scale");
                 SetUrpInt("m_UpscalingFilter", 2, "Apply Clean Upscaling");
+                SetCompositeVirtualResolution(1280, 720, 1f);
                 RefreshPage();
             })),
         }));
 
-        contentScroll.Add(CreateSectionCard("低清画布", "这组控制决定你的世界先被渲染成多粗糙，再被放大到屏幕上。", section =>
+        contentScroll.Add(CreateSectionCard("低清画布", "这组控制决定你的世界先被渲染成多粗糙，再被放大到屏幕上。当前项目把 Phase 09 收束成 Composite 的固定虚拟分辨率档位。", section =>
         {
             section.Add(CreateFloatControl(
                 "Render Scale",
@@ -400,7 +480,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 }));
         }));
 
-        contentScroll.Add(CreateSectionCard("URP 基线", "这组不是主风格，但会决定后处理是否好接、灯光是否过度现代。", section =>
+        contentScroll.Add(CreateSectionCard("URP 基线", "这组不是主风格，但会决定后处理是否好接、灯光是否过度现代。Render Scale 现在承担“粗验证”职责；真正封档虚拟画布请看下方自动调试与固定分辨率摘要。", section =>
         {
             section.Add(CreateToggleControl(
                 "HDR",
@@ -433,6 +513,14 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 0f, 50f,
                 () => GetUrpFloat("m_ShadowDistance"),
                 value => SetUrpFloat("m_ShadowDistance", value, "Change Shadow Distance")));
+        }));
+
+        contentScroll.Add(CreateSectionCard("AI 自动化调试可用性", "这里总结当前 AI/编辑器能安全直接操作的固定分辨率相关接线，方便后续维护时快速判断。", section =>
+        {
+            section.Add(CreateChecklistLabel($"当前活动场景：`{EditorSceneManager.GetActiveScene().path}`，主相机 `Main Camera` 直接输出到屏幕，Target Texture = None。"));
+            section.Add(CreateChecklistLabel("AI 当前可直接改：`Assets/Settings/URP-HighFidelity.asset` 的 Render Scale / Upscaling、`Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat` 的 VirtualWidth/Height/Pixelate、Renderer Feature 开关、Bloom Volume。"));
+            section.Add(CreateChecklistLabel("AI 当前不能直接验证：不同显示器真实黑边、运行时鼠标坐标映射、最终构建包分辨率一致性。这些仍需你手测 GameView/Player。"));
+            section.Add(CreateChecklistLabel("因此 Phase 09 现阶段对 AI 最友好的做法，就是把固定档位与排查入口都收敛进控制台，而不是额外引入一套尚未接交互系统的运行时代码。"));
         }));
     }
 
@@ -579,11 +667,11 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
             })),
         }));
 
-        contentScroll.Add(CreateSectionCard("Pass 开关", "先别急着调数值。先确定是不是这层在作祟。", section =>
+        contentScroll.Add(CreateSectionCard("Pass 开关", "先别急着调数值。先确定是不是这层在主导画面风格。", section =>
         {
             section.Add(CreateToggleControl(
                 "RetroPosterizeThreshold Feature",
-                "总开关。关掉：07 完全不参与；打开：暗部会按阈值走 LUT。排查偏色时，这是第一开关。",
+                "总开关。关掉：07 完全不参与；打开：暗部会按阈值走 LUT。排查风格来源时，优先关闭此层观察。",
                 () => IsRendererFeatureActive(PosterizeFeatureName),
                 value => SetRendererFeatureActive(PosterizeFeatureName, value)));
 
@@ -648,7 +736,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
 
     private void BuildRetroCompositePage()
     {
-        AddPageTitle("Phase 08 / Retro Composite", "这层是调味料，不是主菜。它负责镜头损坏、颗粒、量化、调色板、暗角和最终复古输出。如果 07 没把画面搞黄，这里通常是第二嫌疑人。" );
+        AddPageTitle("Phase 08 / Retro Composite", "这层是调味料，不是主菜。它负责镜头损坏、颗粒、量化、调色板、暗角和最终复古输出。" );
 
         contentScroll.Add(CreateButtonRow(new[]
         {
@@ -657,10 +745,11 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 SetCompositeDefaults();
                 RefreshPage();
             })),
-            ("降低暖色污染", (Action)(() =>
+            ("降低风格强度", (Action)(() =>
             {
                 SetMaterialFloat(config.retroCompositeMaterial, "_PaletteStrength", 0.18f, "Reduce Palette Strength");
                 SetMaterialColor(config.retroCompositeMaterial, "_WarmTint", new Color(1.02f, 0.94f, 0.84f, 1f), "Reduce Warm Tint");
+                SetMaterialFloat(config.retroCompositeMaterial, "_ScanlineStrength", 0.02f, "Reduce Scanline");
                 RefreshPage();
             })),
             ("更脏更旧", (Action)(() =>
@@ -672,7 +761,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
             })),
         }));
 
-        contentScroll.Add(CreateSectionCard("Pass 开关", "如果 07 关掉以后还是黄，先关这一层再看。", section =>
+        contentScroll.Add(CreateSectionCard("Pass 开关", "如果 07 关掉以后仍有明显偏色，先关这一层再做判断。", section =>
         {
             section.Add(CreateToggleControl(
                 "CardDungeon Retro Composite Feature",
@@ -838,6 +927,38 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 0f, 1f,
                 () => GetMaterialFloat(config.retroCompositeMaterial, "_VignetteRadius"),
                 value => SetMaterialFloat(config.retroCompositeMaterial, "_VignetteRadius", value, "Change Vignette Radius")));
+        }));
+
+        contentScroll.Add(CreateSectionCard("Bloom（URP Volume）", "Bloom 控制发光溢出。参考计划建议只让小面积信息点（蜡烛、眼睛、符文）发光，不要照亮全场。当前 Volume 中 Bloom Intensity 可能偏高，需要手动收敛。", section =>
+        {
+            section.Add(CreateFloatControl(
+                "Threshold",
+                "Bloom 触发阈值。调大：只有更亮的像素才发光；调小：更多区域进入 Bloom。想减少全场泛光，优先提高此值。",
+                0f, 2f,
+                () => GetBloomFloat("threshold"),
+                value => SetBloomFloat("threshold", value, "Change Bloom Threshold")));
+
+            section.Add(CreateFloatControl(
+                "Intensity",
+                "Bloom 强度。调大：发光更强烈、更糊；调小：更收敛。参考计划建议 0.15~0.45，当前项目值可能明显偏高。",
+                0f, 5f,
+                () => GetBloomFloat("intensity"),
+                value => SetBloomFloat("intensity", value, "Change Bloom Intensity")));
+
+            section.Add(CreateFloatControl(
+                "Scatter",
+                "Bloom 扩散半径。调大：光晕更散；调小：更集中。",
+                0f, 1f,
+                () => GetBloomFloat("scatter"),
+                value => SetBloomFloat("scatter", value, "Change Bloom Scatter")));
+
+            section.Add(CreateColorControl(
+                "Tint",
+                "Bloom 色调乘色。偏暖会让发光更像烛光；偏冷更像魂火。",
+                () => GetBloomColor("tint"),
+                value => SetBloomColor("tint", value, "Change Bloom Tint")));
+
+            section.Add(CreateObjectRow("Volume Profile", config.globalVolumeProfile, "Bloom 参数直接写回此 Volume Profile。"));
         }));
     }
 
@@ -1457,6 +1578,139 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         SetMaterialFloat(config.retroCompositeMaterial, "_HorizontalJitter", 0.08f, "Set Composite Jitter");
         SetMaterialColor(config.retroCompositeMaterial, "_WarmTint", new Color(1.08f, 0.88f, 0.62f, 1f), "Set Composite Warm Tint");
         SetMaterialColor(config.retroCompositeMaterial, "_ColdTint", new Color(0.10f, 0.36f, 0.32f, 1f), "Set Composite Cold Tint");
+    }
+
+    private void SetCompositeVirtualResolution(int width, int height, float pixelate)
+    {
+        SetMaterialFloat(config.retroCompositeMaterial, "_VirtualWidth", width, "Set Composite Virtual Width");
+        SetMaterialFloat(config.retroCompositeMaterial, "_VirtualHeight", height, "Set Composite Virtual Height");
+        SetMaterialFloat(config.retroCompositeMaterial, "_Pixelate", pixelate, "Set Composite Pixelate");
+    }
+
+    private void BuildPresetsPage()
+    {
+        AddPageTitle("预设 / Presets", "一键切换整套渲染风格。每个预设同时覆盖 Phase 07、Phase 08 和 Bloom 参数。");
+
+        contentScroll.Add(CreateButtonRow(new[]
+        {
+            ("生成/刷新四组默认预设", (Action)(() =>
+            {
+                RetroRenderPreset.GenerateOrUpdateDefaultPresets(config);
+                RefreshPage();
+            })),
+            ("保存当前为新预设", (Action)(() =>
+            {
+                string path = EditorUtility.SaveFilePanelInProject("保存预设", "Retro_Custom", "asset", "选择保存位置", RetroRenderPreset.PresetFolderPath);
+                if (!string.IsNullOrEmpty(path))
+                {
+                    RetroRenderPreset.CaptureCurrentToAsset(path, System.IO.Path.GetFileNameWithoutExtension(path), config,
+                        PosterizeFeatureName, CompositeFeatureName);
+                    RefreshPage();
+                }
+            })),
+            ("封档当前核心效果", (Action)(() =>
+            {
+                RetroRenderPreset.CaptureCurrentToAsset(RetroRenderPreset.ArchivePresetPath, "Retro_Archive_Current", config,
+                    PosterizeFeatureName, CompositeFeatureName);
+                RefreshPage();
+            })),
+        }));
+
+        contentScroll.Add(CreateSectionCard("封档说明", "当前阶段不再延伸到 06 卡牌和后续系统，所以这里保留一个专门的封档预设，用来冻结当前核心视效参数。", section =>
+        {
+            section.Add(CreateChecklistLabel("推荐封档资产：`Assets/_Project/Rendering/Presets/Retro_Archive_Current.asset`。每次阶段性收尾时直接覆盖它。"));
+            section.Add(CreateChecklistLabel("四组官方预设用于调试与风格切换；Archive 预设用于记录你确认过的当前核心实现。"));
+            section.Add(CreateChecklistLabel("如果控制台里看不到新建预设，优先点击“重新读取资产”或再次打开窗口；现在配置资产会自动同步预设列表。"));
+        }));
+
+        if (config.presets == null || config.presets.Count == 0)
+        {
+            contentScroll.Add(new HelpBox("当前没有加载任何预设。点击上方“生成/刷新四组默认预设”按钮创建 Clean Debug / Default Retro / Dark Horror / Combat Readability 四组官方预设，或使用“封档当前核心效果”生成 Archive 预设。", HelpBoxMessageType.Info));
+            return;
+        }
+
+        contentScroll.Add(CreateSectionCard("已加载的预设", "点击预设名称一键应用。Archive 预设用于回到当前封档核心效果。", section =>
+        {
+            foreach (var preset in config.presets)
+            {
+                if (preset == null) continue;
+                section.Add(new Button(() =>
+                {
+                    preset.Apply(config.retroPosterizeThresholdMaterial, config.retroCompositeMaterial,
+                        config.highFidelityRenderer, config.globalVolumeProfile,
+                        PosterizeFeatureName, CompositeFeatureName);
+                    RefreshPage();
+                })
+                {
+                    text = $"应用：{preset.name}"
+                });
+            }
+        }));
+    }
+
+    private float GetBloomFloat(string propertyName)
+    {
+        if (config.globalVolumeProfile == null) return 0f;
+        if (config.globalVolumeProfile.TryGet<Bloom>(out var bloom))
+        {
+            return propertyName switch
+            {
+                "threshold" => bloom.threshold.value,
+                "intensity" => bloom.intensity.value,
+                "scatter" => bloom.scatter.value,
+                _ => 0f
+            };
+        }
+        return 0f;
+    }
+
+    private void SetBloomFloat(string propertyName, float value, string undoName)
+    {
+        if (config.globalVolumeProfile == null) return;
+        if (config.globalVolumeProfile.TryGet<Bloom>(out var bloom))
+        {
+            Undo.RecordObject(config.globalVolumeProfile, undoName);
+            switch (propertyName)
+            {
+                case "threshold":
+                    bloom.threshold.value = value;
+                    bloom.threshold.overrideState = true;
+                    break;
+                case "intensity":
+                    bloom.intensity.value = value;
+                    bloom.intensity.overrideState = true;
+                    break;
+                case "scatter":
+                    bloom.scatter.value = value;
+                    bloom.scatter.overrideState = true;
+                    break;
+            }
+            EditorUtility.SetDirty(config.globalVolumeProfile);
+            RepaintViews();
+        }
+    }
+
+    private Color GetBloomColor(string propertyName)
+    {
+        if (config.globalVolumeProfile == null) return Color.white;
+        if (config.globalVolumeProfile.TryGet<Bloom>(out var bloom) && propertyName == "tint")
+        {
+            return bloom.tint.value;
+        }
+        return Color.white;
+    }
+
+    private void SetBloomColor(string propertyName, Color value, string undoName)
+    {
+        if (config.globalVolumeProfile == null) return;
+        if (config.globalVolumeProfile.TryGet<Bloom>(out var bloom) && propertyName == "tint")
+        {
+            Undo.RecordObject(config.globalVolumeProfile, undoName);
+            bloom.tint.value = value;
+            bloom.tint.overrideState = true;
+            EditorUtility.SetDirty(config.globalVolumeProfile);
+            RepaintViews();
+        }
     }
 
     private void SaveAllAssets()

@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0196d3d91f624de4e8805e2e3dd5450d, type: 3}
+  m_Name: Retro_Archive_Current
+  m_EditorClassIdentifier: 
+  phase07FeatureActive: 1
+  lut: {fileID: 2800000, guid: 5babb6ba4e10a0e4abe3edaad6165c2d, type: 2}
+  contribution: 0.512
+  threshold: 0.973
+  thresholdSharpness: 11.45
+  lutStrength: 1
+  phase08FeatureActive: 1
+  virtualWidth: 960
+  virtualHeight: 540
+  pixelate: 1
+  posterizeLevels: 8
+  posterizeStrength: 0.42
+  paletteStrength: 0.34
+  paletteDarkThreshold: 0.46
+  ditherStrength: 0.03
+  blackCrush: 0.1
+  contrast: 1.28
+  saturation: 0.92
+  vignetteStrength: 0.62
+  vignetteRadius: 0.72
+  scanlineStrength: 0.12
+  chromaticAberration: 0.45
+  noiseStrength: 0.035
+  crtCurvature: 0.025
+  crtEdgeSoftness: 0.02
+  crtGlowBleed: 0.22
+  horizontalJitter: 0.08
+  warmTint: {r: 1.08, g: 0.88, b: 0.62, a: 1}
+  coldTint: {r: 0.09999997, g: 0.35999998, b: 0.31999996, a: 1}
+  bloomThreshold: 0.52
+  bloomIntensity: 1.35
+  bloomScatter: 0.42
+  bloomTint: {r: 1, g: 0.7, b: 0.38, a: 1}

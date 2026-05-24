@@ -1,6 +1,8 @@
 using Sirenix.OdinInspector;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
 [CreateAssetMenu(menuName = "CardDungeon/Rendering/Render Pipeline Console Config", fileName = "CardDungeonRenderPipelineConsoleConfig")]
@@ -49,6 +51,14 @@ public sealed class CardDungeonRenderPipelineConsoleConfig : ScriptableObject
     [PreviewField(70, ObjectFieldAlignment.Left), AssetsOnly]
     public Texture2D candleRedLut;
 
+    [TitleGroup("核心资产")]
+    [Required, AssetsOnly]
+    public VolumeProfile globalVolumeProfile;
+
+    [TitleGroup("预设")]
+    [AssetsOnly]
+    public List<RetroRenderPreset> presets = new List<RetroRenderPreset>();
+
     [TitleGroup("操作")]
     [Button("按当前项目默认路径自动填充")]
     public void AutoPopulate()
@@ -62,6 +72,26 @@ public sealed class CardDungeonRenderPipelineConsoleConfig : ScriptableObject
         dirtyBrownLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_DirtyBrown.asset");
         darkGreenLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_DarkGreen.asset");
         candleRedLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_CandleRed.asset");
+        globalVolumeProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/Settings/SampleSceneProfile.asset");
+
+        if (presets == null) presets = new List<RetroRenderPreset>();
+        RetroRenderPreset.SyncPresetList(this);
+
         EditorUtility.SetDirty(this);
+    }
+
+    private static void EnsureFolder(string folderPath)
+    {
+        string[] parts = folderPath.Split('/');
+        string current = parts[0];
+        for (int i = 1; i < parts.Length; i++)
+        {
+            string next = current + "/" + parts[i];
+            if (!AssetDatabase.IsValidFolder(next))
+            {
+                AssetDatabase.CreateFolder(current, parts[i]);
+            }
+            current = next;
+        }
     }
 }

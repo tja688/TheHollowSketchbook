@@ -27,3 +27,11 @@ MonoBehaviour:
   dirtyBrownLut: {fileID: 2800000, guid: 5babb6ba4e10a0e4abe3edaad6165c2d, type: 2}
   darkGreenLut: {fileID: 2800000, guid: f8858d08268926449b49dbb49472dd18, type: 2}
   candleRedLut: {fileID: 2800000, guid: ff1c533bd08be244d94a8faae0b5d930, type: 2}
+  globalVolumeProfile: {fileID: 11400000, guid: a6560a915ef98420e9faacc1c7438823,
+    type: 2}
+  presets:
+  - {fileID: 11400000, guid: eca6bba7cc3d6ce498d3b607dcc3a5d9, type: 2}
+  - {fileID: 11400000, guid: e733cbcf0cf05e742aa7e05af32cd3c9, type: 2}
+  - {fileID: 11400000, guid: 9227fd890d675e141a9f286fd8844984, type: 2}
+  - {fileID: 11400000, guid: 1c113d457d288f8499fcd43f7202fa06, type: 2}
+  - {fileID: 11400000, guid: d4e02b8a14f47134ebbfa620abf330ed, type: 2}

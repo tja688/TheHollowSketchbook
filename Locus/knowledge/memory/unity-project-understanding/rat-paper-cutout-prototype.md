@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779261693245
-updatedAt: 1779590401001
+updatedAt: 1779606871344
 ---
 
 # rat-paper-cutout-prototype
 
 ## Summary
-TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, retro render validation scene wiring, Phase 05/07 render assets, and the new editor render control console entry points and config paths.
+TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, retro render validation scene wiring, Phase 05/07/08 render assets, and the editor render control console including archived Phase 09 virtual-resolution workflow and preset paths.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -54,7 +54,11 @@ TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, r
 - Phase 07 is active by default in `Assets/Settings/URP-HighFidelity-Renderer.asset` as FullScreenPassRendererFeature `RetroPosterizeThreshold`, ordered after SSAO and before `CardDungeon Retro Composite`, injected After Rendering Post Processing with Color requirement. Default params: `_Threshold=0.50`, `_ThresholdSharpness=12`, `_Contribution=0.85`, `_LutStrength=1`, LUT DirtyBrown, `_CompareDebug=0`, `_DebugMask=0`. Toggle comparison by disabling the `RetroPosterizeThreshold` renderer feature, or set `_CompareDebug=1` / `_DebugMask=1` on the material.
 - `Assets/Settings/SampleSceneProfile.asset` is used by the older `Global Volume` setup in `Assets/Scenes/SampleScene.unity`, not by `Assets/Tests/render.unity` unless a volume is added.
 - Creating TextMeshPro 3D labels caused Unity to import TMP essentials under `Assets/TextMesh Pro/`; keep this if the scene labels or future card text use TextMeshPro.
-- On 2026-05-23, a dedicated editor window control panel was added at `Assets/_Project/Editor/Rendering/CardDungeonRenderPipelineConsoleWindow.cs` with config asset `Assets/_Project/Editor/Rendering/CardDungeonRenderPipelineConsoleConfig.asset`, opened from menu `Tools/CardDungeon Rendering/项目渲染管线综合控制台`. It directly manages `Assets/Settings/URP-HighFidelity.asset`, `Assets/Settings/URP-HighFidelity-Renderer.asset`, `Assets/_Project/Rendering/Materials/M_RetroPosterizeThreshold_Phase07.mat`, `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat`, and batch-shared Phase 05 values for all `CardDungeon/RetroFakeLit` materials under `Assets/_Project/Rendering/Materials/`.
-- The render console is organized into pages: Overview, Render Scale/URP baseline, Phase 05 RetroFakeLit, Phase 07 Posterize LUT, and Phase 08 Retro Composite. Each control includes user-facing explanation text about what increasing or decreasing the parameter changes.
-- Important project quirk: `Assets/Settings/URP-HighFidelity.asset` currently serializes `m_UpscalingFilter = 4`, while the runtime enum probe for `UpscalingFilterSelection` reported values 0=Auto, 1=Linear, 2=Point, 3=FSR. The new control panel therefore exposes raw option 4 as a special “current project value” choice instead of assuming a semantic mapping and rewriting it blindly.
+- On 2026-05-23, a dedicated editor window control panel was added at `Assets/_Project/Editor/Rendering/CardDungeonRenderPipelineConsoleWindow.cs` with config asset `Assets/_Project/Editor/Rendering/CardDungeonRenderPipelineConsoleConfig.asset`, opened from menu `Tools/CardDungeon Rendering/项目渲染管线综合控制台`. It directly manages `Assets/Settings/URP-HighFidelity.asset`, `Assets/Settings/URP-HighFidelity-Renderer.asset`, `Assets/_Project/Rendering/Materials/M_RetroPosterizeThreshold_Phase07.mat`, `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat`, `Assets/Settings/SampleSceneProfile.asset`, and batch-shared Phase 05 values for all `CardDungeon/RetroFakeLit` materials under `Assets/_Project/Rendering/Materials/`.
+- The render console is organized into pages: Overview, Render Scale/URP baseline, Phase 05 RetroFakeLit, Phase 07 Posterize LUT, Phase 08 Retro Composite, and Presets. Each control includes user-facing explanation text about what increasing or decreasing the parameter changes.
+- Important project quirk: `Assets/Settings/URP-HighFidelity.asset` currently serializes `m_UpscalingFilter = 4`, while the runtime enum probe for `UpscalingFilterSelection` reported values 0=Auto, 1=Linear, 2=Point, 3=FSR. The control panel keeps raw option 4 exposed as a special “current project value” choice instead of assuming a semantic mapping.
+- On 2026-05-23, Phase 09 was archived as a control-console-driven fixed virtual resolution workflow rather than a new runtime `FixedVirtualResolutionController`: the authoritative virtual pixel size now lives in `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat` (`_VirtualWidth`, `_VirtualHeight`, `_Pixelate`), with quick switches for 640x360 / 960x540 / 1280x720 in the Render Scale page.
+- `Assets/Tests/render.unity/Main Camera` currently renders directly to screen (`Target Texture = None`) and has no runtime letterbox/pillarbox or mouse-coordinate remap logic; this project state is intentional for the current archive because card interaction and later runtime systems were explicitly deferred.
+- Preset assets are managed under `Assets/_Project/Rendering/Presets/`. The console now auto-syncs preset references into `Assets/_Project/Editor/Rendering/CardDungeonRenderPipelineConsoleConfig.asset`, supports default preset regeneration, and uses `Assets/_Project/Rendering/Presets/Retro_Archive_Current.asset` as the archive snapshot of the currently approved core look.
+- Current archive snapshot values captured from project assets are: Phase07 LUT DirtyBrown, `threshold=0.97`, `contribution=0.51`, `thresholdSharpness=11.45`; Composite virtual resolution `960x540`; Bloom intensity `1.35` from `Assets/Settings/SampleSceneProfile.asset`.
 <!-- locus:body:end -->

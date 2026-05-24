@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0196d3d91f624de4e8805e2e3dd5450d, type: 3}
+  m_Name: Retro_CleanDebug
+  m_EditorClassIdentifier: 
+  phase07FeatureActive: 1
+  lut: {fileID: 2800000, guid: 5babb6ba4e10a0e4abe3edaad6165c2d, type: 2}
+  contribution: 0.35
+  threshold: 0.35
+  thresholdSharpness: 8
+  lutStrength: 0.5
+  phase08FeatureActive: 1
+  virtualWidth: 960
+  virtualHeight: 540
+  pixelate: 0.5
+  posterizeLevels: 12
+  posterizeStrength: 0.15
+  paletteStrength: 0.1
+  paletteDarkThreshold: 0.4
+  ditherStrength: 0.01
+  blackCrush: 0.02
+  contrast: 1
+  saturation: 1
+  vignetteStrength: 0.2
+  vignetteRadius: 0.85
+  scanlineStrength: 0
+  chromaticAberration: 0.1
+  noiseStrength: 0.01
+  crtCurvature: 0.01
+  crtEdgeSoftness: 0.01
+  crtGlowBleed: 0.1
+  horizontalJitter: 0.02
+  warmTint: {r: 1.02, g: 0.95, b: 0.85, a: 1}
+  coldTint: {r: 0.12, g: 0.34, b: 0.3, a: 1}
+  bloomThreshold: 1.2
+  bloomIntensity: 0.15
+  bloomScatter: 0.3
+  bloomTint: {r: 1, g: 0.9, b: 0.7, a: 1}
