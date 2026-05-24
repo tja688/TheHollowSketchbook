@@ -133,7 +133,7 @@ PrefabInstance:
     - target: {fileID: 5256126620345041070, guid: b81d6dc7a3f615648a2a06a319843199,
         type: 3}
       propertyPath: m_Name
-      value: gezinkte_spielkarte_km_o_811_RetroFakeLit
+      value: RetroFakeLit_Card
       objectReference: {fileID: 0}
     - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
         type: 3}
@@ -1410,7 +1410,7 @@ PrefabInstance:
     - target: {fileID: 8128668236925612103, guid: 12f771db1305ce14b96795d6ef1ae9c1,
         type: 3}
       propertyPath: m_Name
-      value: card (1)
+      value: Normal_Card
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
         type: 3}
