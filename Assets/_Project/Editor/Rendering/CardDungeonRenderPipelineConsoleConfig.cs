@@ -1,4 +1,5 @@
 using Sirenix.OdinInspector;
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -9,6 +10,7 @@ using UnityEngine.Rendering.Universal;
 public sealed class CardDungeonRenderPipelineConsoleConfig : ScriptableObject
 {
     public const string AssetPath = "Assets/_Project/Editor/Rendering/CardDungeonRenderPipelineConsoleConfig.asset";
+    public const string DefaultRetroFakeLitPrefabFolderPath = "Assets/Arts/Prefabs/RetroFakeLits";
 
     [TitleGroup("说明")]
     [InfoBox("这个配置资产只保存控制台引用。真正的渲染数值会直接写回 URP 资产、Renderer 资产和材质资产。")]
@@ -34,6 +36,10 @@ public sealed class CardDungeonRenderPipelineConsoleConfig : ScriptableObject
     [TitleGroup("核心资产")]
     [AssetsOnly]
     public DefaultAsset retroFakeLitMaterialFolder;
+
+    [TitleGroup("核心资产")]
+    [AssetsOnly]
+    public DefaultAsset retroFakeLitPrefabFolder;
 
     [TitleGroup("核心资产")]
     [AssetsOnly]
@@ -69,6 +75,7 @@ public sealed class CardDungeonRenderPipelineConsoleConfig : ScriptableObject
         retroCompositeMaterial = AssetDatabase.LoadAssetAtPath<Material>("Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat");
         retroFakeLitShader = Shader.Find("CardDungeon/RetroFakeLit");
         retroFakeLitMaterialFolder = AssetDatabase.LoadAssetAtPath<DefaultAsset>("Assets/_Project/Rendering/Materials");
+        retroFakeLitPrefabFolder = AssetDatabase.LoadAssetAtPath<DefaultAsset>(DefaultRetroFakeLitPrefabFolderPath);
         dirtyBrownLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_DirtyBrown.asset");
         darkGreenLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_DarkGreen.asset");
         candleRedLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_CandleRed.asset");

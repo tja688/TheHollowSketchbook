@@ -23,6 +23,8 @@ MonoBehaviour:
     type: 2}
   retroFakeLitMaterialFolder: {fileID: 102900000, guid: 6c1af83ec7785af4cabdb9c42f1f732c,
     type: 3}
+  retroFakeLitPrefabFolder: {fileID: 102900000, guid: 0a73e1c8aec1c0a4787309c157fc837f,
+    type: 3}
   retroFakeLitShader: {fileID: 4800000, guid: 06804bf8385d3cd479ab08fbdc42fecd, type: 3}
   dirtyBrownLut: {fileID: 2800000, guid: 5babb6ba4e10a0e4abe3edaad6165c2d, type: 2}
   darkGreenLut: {fileID: 2800000, guid: f8858d08268926449b49dbb49472dd18, type: 2}

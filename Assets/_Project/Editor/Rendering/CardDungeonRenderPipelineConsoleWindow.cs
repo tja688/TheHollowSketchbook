@@ -50,6 +50,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         Overview,
         RenderScale,
         RetroFakeLit,
+        RetroFakeLitConvert,
         Phase07Posterize,
         RetroComposite,
         Presets
@@ -58,6 +59,10 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
     [SerializeField] private CardDungeonRenderPipelineConsoleConfig config;
     [SerializeField] private ConsolePage currentPage;
     [SerializeField] private Phase05BatchState phase05BatchState = new Phase05BatchState();
+    [SerializeField] private DefaultAsset retroFakeLitConvertSourceFolder;
+    [SerializeField] private string retroFakeLitConvertLastSummary;
+    [SerializeField] private string retroFakeLitConvertLastLog;
+    [SerializeField] private int retroFakeLitConvertLastFailureCount;
 
     private readonly List<Button> navButtons = new List<Button>();
     private ScrollView contentScroll;
@@ -76,6 +81,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
     {
         EnsureConfig();
         PullPhase05SharedValues();
+        EnsureRetroFakeLitConvertDefaults();
     }
 
     public void CreateGUI()
@@ -113,6 +119,12 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
             if (config.globalVolumeProfile == null)
             {
                 config.globalVolumeProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/Settings/SampleSceneProfile.asset");
+                dirty = true;
+            }
+            if (config.retroFakeLitPrefabFolder == null)
+            {
+                EnsureFolder(CardDungeonRenderPipelineConsoleConfig.DefaultRetroFakeLitPrefabFolderPath);
+                config.retroFakeLitPrefabFolder = AssetDatabase.LoadAssetAtPath<DefaultAsset>(CardDungeonRenderPipelineConsoleConfig.DefaultRetroFakeLitPrefabFolderPath);
                 dirty = true;
             }
             if (config.presets == null)
@@ -222,6 +234,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         navigationRoot.Add(CreateNavButton(ConsolePage.Overview, "总览", "看当前是哪几层参数在主导画面，先定位问题。"));
         navigationRoot.Add(CreateNavButton(ConsolePage.RenderScale, "低清画布 / URP 基线", "Phase 03 / 09：控制内部画布分辨率、上采样和 URP 基础设置。"));
         navigationRoot.Add(CreateNavButton(ConsolePage.RetroFakeLit, "Phase 05 / RetroFakeLit", "批量调整普通物体假光照材质的共有参数。"));
+        navigationRoot.Add(CreateNavButton(ConsolePage.RetroFakeLitConvert, "RetroFakeLitConvert", "把文件夹模型或场景对象一键转成 RetroFakeLit prefab。"));
         navigationRoot.Add(CreateNavButton(ConsolePage.Phase07Posterize, "Phase 07 / 暗部阈值 LUT", "控制暗部统一染色，保留亮部可读性。"));
         navigationRoot.Add(CreateNavButton(ConsolePage.RetroComposite, "Phase 08 / Retro Composite", "统一管理镜头、颗粒、暗角、量化、冷暖偏色等整体风格。"));
         navigationRoot.Add(CreateNavButton(ConsolePage.Presets, "预设 / Presets", "一键切换四组官方预设，或保存当前参数为新预设。"));
@@ -294,6 +307,9 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 break;
             case ConsolePage.RetroFakeLit:
                 BuildRetroFakeLitPage();
+                break;
+            case ConsolePage.RetroFakeLitConvert:
+                BuildRetroFakeLitConvertPage();
                 break;
             case ConsolePage.Phase07Posterize:
                 BuildPhase07Page();
@@ -397,6 +413,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
             section.Add(CreateObjectRow("Composite 材质", config.retroCompositeMaterial, "控制镜头、量化、颗粒、暗角、冷暖偏色。"));
             section.Add(CreateObjectRow("Volume Profile", config.globalVolumeProfile, "URP 后处理 Volume，包含 Bloom 等内置效果。"));
             section.Add(CreateObjectRow("RetroFakeLit 材质文件夹", config.retroFakeLitMaterialFolder, "普通物体材质集中在这里。Phase 05 页面会批量写回这些材质。"));
+            section.Add(CreateObjectRow("RetroFakeLit Prefab 输出文件夹", config.retroFakeLitPrefabFolder, "RetroFakeLitConvert 会把转换后的 prefab 写到这里。"));
         }));
 
         contentScroll.Add(CreateSectionCard("快速排查建议", "按下面顺序关闭各层，观察画面变化，定位风格主导来源。", section =>
@@ -636,6 +653,99 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
             {
                 section.Add(CreateTinyPathLabel($"… 其余 {materials.Count - 12} 个材质已省略"));
             }
+        }));
+    }
+
+    private void BuildRetroFakeLitConvertPage()
+    {
+        AddPageTitle("RetroFakeLitConvert", "这是 Convert Selection To RetroFakeLit 的一键增强版。它可以处理模型文件夹，也可以直接处理当前场景选择，并把结果 prefab 统一产出到指定文件夹。" );
+
+        string outputFolderPath = GetRetroFakeLitPrefabFolderPath();
+        List<string> discoveredModels = retroFakeLitConvertSourceFolder != null
+            ? RetroFakeLitConversionService.GetDiscoverableModelAssetPaths(retroFakeLitConvertSourceFolder)
+            : new List<string>();
+        int sceneSelectionCount = Selection.gameObjects.Count(gameObject => gameObject != null && gameObject.scene.IsValid());
+
+        contentScroll.Add(new HelpBox("处理逻辑：自动探索文件夹结构、判断单模型/多模型、识别 glTF/fbx/obj 等导入资源，转换其 Renderer 材质到 RetroFakeLit。场景对象会被立即替换为新 prefab 实例，方便你直接观察变化。", HelpBoxMessageType.Info));
+
+        contentScroll.Add(CreateButtonRow(new[]
+        {
+            ("处理源文件夹", (Action)(() => RunRetroFakeLitConvertFromFolder())),
+            ("处理当前场景选择", (Action)(() => RunRetroFakeLitConvertFromSelection())),
+            ("文件夹 + 选择一起处理", (Action)(() => RunRetroFakeLitConvertFromFolderAndSelection())),
+            ("Ping 输出文件夹", (Action)(() => PingObject(config.retroFakeLitPrefabFolder))),
+        }));
+
+        contentScroll.Add(CreateSectionCard("输入与输出", "这里指定模型来源和产出位置。输出文件夹会直接写入 prefab 资产。", section =>
+        {
+            section.Add(CreateObjectFieldControl(
+                "源文件夹",
+                "可指向任意 Project 文件夹。点击“处理源文件夹”后，会递归探索其下所有 gltf/fbx/obj 等模型资源。",
+                typeof(DefaultAsset),
+                () => retroFakeLitConvertSourceFolder,
+                value => SetRetroFakeLitConvertSourceFolder(value as DefaultAsset)));
+
+            section.Add(CreateObjectFieldControl(
+                "Prefab 输出文件夹",
+                "转换结果 prefab 的默认落点。若留空，会自动回到 `Assets/Arts/Prefabs/RetroFakeLits`。",
+                typeof(DefaultAsset),
+                () => config.retroFakeLitPrefabFolder,
+                value => SetRetroFakeLitPrefabFolder(value as DefaultAsset)));
+
+            section.Add(CreateChecklistLabel($"当前输出路径：`{outputFolderPath}`"));
+            section.Add(CreateChecklistLabel($"当前场景选择根对象数：{sceneSelectionCount}"));
+            if (retroFakeLitConvertSourceFolder == null)
+            {
+                section.Add(CreateChecklistLabel("当前未指定源文件夹。你仍然可以直接处理当前场景选择。"));
+            }
+            else if (discoveredModels.Count == 0)
+            {
+                section.Add(CreateChecklistLabel("当前源文件夹下未发现可处理模型。请确认里面是否有 gltf/fbx/obj 等已导入资源。"));
+            }
+            else
+            {
+                section.Add(CreateChecklistLabel($"当前源文件夹已发现 {discoveredModels.Count} 个模型资源。"));
+            }
+        }));
+
+        contentScroll.Add(CreateSectionCard("源文件夹预览（前 12 个）", "只用于确认面板将会递归扫描什么，不在这里直接编辑。", section =>
+        {
+            if (retroFakeLitConvertSourceFolder == null)
+            {
+                section.Add(CreateTinyPathLabel("<未指定源文件夹>"));
+                return;
+            }
+
+            if (discoveredModels.Count == 0)
+            {
+                section.Add(CreateTinyPathLabel("<没有发现可处理模型>"));
+                return;
+            }
+
+            foreach (string path in discoveredModels.Take(12))
+            {
+                section.Add(CreateTinyPathLabel(path));
+            }
+
+            if (discoveredModels.Count > 12)
+            {
+                section.Add(CreateTinyPathLabel($"… 其余 {discoveredModels.Count - 12} 个模型已省略"));
+            }
+        }));
+
+        contentScroll.Add(CreateSectionCard("Debug 栏", "转换成功与失败原因都会记录在这里。失败时优先先看这里，而不是猜。", section =>
+        {
+            HelpBoxMessageType messageType = retroFakeLitConvertLastFailureCount > 0 ? HelpBoxMessageType.Warning : HelpBoxMessageType.Info;
+            section.Add(new HelpBox(string.IsNullOrEmpty(retroFakeLitConvertLastSummary) ? "尚未执行转换。" : retroFakeLitConvertLastSummary, messageType));
+
+            TextField debugField = new TextField
+            {
+                value = string.IsNullOrEmpty(retroFakeLitConvertLastLog) ? "<暂无日志>" : retroFakeLitConvertLastLog,
+                multiline = true
+            };
+            debugField.style.minHeight = 220;
+            debugField.SetEnabled(false);
+            section.Add(debugField);
         }));
     }
 
@@ -1329,6 +1439,128 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
     {
         Texture texture = material != null && material.HasProperty(propertyName) ? material.GetTexture(propertyName) : null;
         return texture != null ? texture.name : "<none>";
+    }
+
+    private void EnsureRetroFakeLitConvertDefaults()
+    {
+        if (config == null)
+        {
+            return;
+        }
+
+        if (config.retroFakeLitPrefabFolder == null)
+        {
+            EnsureFolder(CardDungeonRenderPipelineConsoleConfig.DefaultRetroFakeLitPrefabFolderPath);
+            config.retroFakeLitPrefabFolder = AssetDatabase.LoadAssetAtPath<DefaultAsset>(CardDungeonRenderPipelineConsoleConfig.DefaultRetroFakeLitPrefabFolderPath);
+            EditorUtility.SetDirty(config);
+        }
+
+        if (retroFakeLitConvertSourceFolder == null)
+        {
+            retroFakeLitConvertSourceFolder = AssetDatabase.LoadAssetAtPath<DefaultAsset>("Assets/Arts/Models");
+        }
+    }
+
+    private void SetRetroFakeLitConvertSourceFolder(DefaultAsset folder)
+    {
+        string path = folder != null ? AssetDatabase.GetAssetPath(folder) : string.Empty;
+        retroFakeLitConvertSourceFolder = string.IsNullOrEmpty(path) || AssetDatabase.IsValidFolder(path) ? folder : null;
+        if (folder != null && retroFakeLitConvertSourceFolder == null)
+        {
+            SetRetroFakeLitConvertLog("失败：源文件夹必须是 Project 里的文件夹资源。", 1);
+        }
+        else
+        {
+            RefreshPage();
+        }
+    }
+
+    private void SetRetroFakeLitPrefabFolder(DefaultAsset folder)
+    {
+        if (config == null)
+        {
+            return;
+        }
+
+        string path = folder != null ? AssetDatabase.GetAssetPath(folder) : string.Empty;
+        if (folder != null && !AssetDatabase.IsValidFolder(path))
+        {
+            SetRetroFakeLitConvertLog("失败：Prefab 输出必须是 Project 里的文件夹资源。", 1);
+            return;
+        }
+
+        config.retroFakeLitPrefabFolder = folder;
+        EditorUtility.SetDirty(config);
+        if (config.retroFakeLitPrefabFolder == null)
+        {
+            EnsureFolder(CardDungeonRenderPipelineConsoleConfig.DefaultRetroFakeLitPrefabFolderPath);
+            config.retroFakeLitPrefabFolder = AssetDatabase.LoadAssetAtPath<DefaultAsset>(CardDungeonRenderPipelineConsoleConfig.DefaultRetroFakeLitPrefabFolderPath);
+            EditorUtility.SetDirty(config);
+        }
+
+        RefreshPage();
+    }
+
+    private string GetRetroFakeLitPrefabFolderPath()
+    {
+        if (config == null || config.retroFakeLitPrefabFolder == null)
+        {
+            return CardDungeonRenderPipelineConsoleConfig.DefaultRetroFakeLitPrefabFolderPath;
+        }
+
+        string path = AssetDatabase.GetAssetPath(config.retroFakeLitPrefabFolder);
+        return string.IsNullOrEmpty(path) ? CardDungeonRenderPipelineConsoleConfig.DefaultRetroFakeLitPrefabFolderPath : path;
+    }
+
+    private void RunRetroFakeLitConvertFromFolder()
+    {
+        if (retroFakeLitConvertSourceFolder == null)
+        {
+            SetRetroFakeLitConvertLog("失败：请先指定源文件夹。", 1);
+            return;
+        }
+
+        ApplyRetroFakeLitConvertReport(RetroFakeLitConversionService.ProcessFolder(retroFakeLitConvertSourceFolder, GetRetroFakeLitPrefabFolderPath()));
+    }
+
+    private void RunRetroFakeLitConvertFromSelection()
+    {
+        ApplyRetroFakeLitConvertReport(RetroFakeLitConversionService.ProcessSceneObjects(Selection.gameObjects, GetRetroFakeLitPrefabFolderPath()));
+    }
+
+    private void RunRetroFakeLitConvertFromFolderAndSelection()
+    {
+        ApplyRetroFakeLitConvertReport(RetroFakeLitConversionService.ProcessBatch(retroFakeLitConvertSourceFolder, Selection.gameObjects, GetRetroFakeLitPrefabFolderPath()));
+    }
+
+    private void ApplyRetroFakeLitConvertReport(RetroFakeLitBatchReport report)
+    {
+        if (report == null)
+        {
+            SetRetroFakeLitConvertLog("失败：没有拿到转换结果。", 1);
+            return;
+        }
+
+        SetRetroFakeLitConvertLog(report.Summary + "\n\n" + string.Join("\n", report.Lines), report.failureCount);
+    }
+
+    private void SetRetroFakeLitConvertLog(string log, int failureCount)
+    {
+        retroFakeLitConvertLastFailureCount = failureCount;
+        retroFakeLitConvertLastLog = log;
+        retroFakeLitConvertLastSummary = FirstLine(log);
+        RefreshPage();
+    }
+
+    private static string FirstLine(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        int breakIndex = value.IndexOf('\n');
+        return breakIndex >= 0 ? value[..breakIndex] : value;
     }
 
     private void SetMaterialFloat(Material material, string propertyName, float value, string undoName)
