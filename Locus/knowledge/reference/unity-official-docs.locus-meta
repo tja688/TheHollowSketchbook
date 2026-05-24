@@ -1,0 +1,17 @@
+version: 4
+summary: Unity 2022.3 官方文档导入结果，来源于当前项目 Unity 2022.3.62f3 对应的官方离线文档。
+injectMode: none
+aiMaintained: false
+explicitMaintenanceRules: true
+vectorSearch: disabled
+inheritToChildren: true
+allowCreateDocuments: false
+allowCreateDirectories: false
+allowMoveDocuments: false
+allowMoveDirectories: false
+maintenanceRules: 该目录由 Unity 官方离线文档自动生成。通过导入功能更新版本，不在这里手动维护页面内容。
+externalSources:
+- provider: unity
+  locator: project:2022.3.62f3;docs:2022.3;locale:en;importedAt:1779588255986
+  sourceId: '2022.3'
+  syncEnabled: true
