@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59b8752d22588b64f9b5c8ca89ee1fe2, type: 3}
+  m_Name: CardDungeonRenderPipelineConsoleConfig
+  m_EditorClassIdentifier: 
+  purpose: "\u9879\u76EE\u6E32\u67D3\u7BA1\u7EBF\u7EFC\u5408\u63A7\u5236\u53F0\u5F15\u7528\u8868"
+  highFidelityPipeline: {fileID: 11400000, guid: 7b7fd9122c28c4d15b667c7040e3b3fd,
+    type: 2}
+  highFidelityRenderer: {fileID: 11400000, guid: c40be3174f62c4acf8c1216858c64956,
+    type: 2}
+  retroPosterizeThresholdMaterial: {fileID: 2100000, guid: 8afc215a9dc8f6e489b22fc0248b866a,
+    type: 2}
+  retroCompositeMaterial: {fileID: 2100000, guid: 49f15f9fbe696504fb29b48eda2db235,
+    type: 2}
+  retroFakeLitMaterialFolder: {fileID: 102900000, guid: 6c1af83ec7785af4cabdb9c42f1f732c,
+    type: 3}
+  retroFakeLitShader: {fileID: 4800000, guid: 06804bf8385d3cd479ab08fbdc42fecd, type: 3}
+  dirtyBrownLut: {fileID: 2800000, guid: 5babb6ba4e10a0e4abe3edaad6165c2d, type: 2}
+  darkGreenLut: {fileID: 2800000, guid: f8858d08268926449b49dbb49472dd18, type: 2}
+  candleRedLut: {fileID: 2800000, guid: ff1c533bd08be244d94a8faae0b5d930, type: 2}

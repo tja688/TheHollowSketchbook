@@ -30,10 +30,10 @@ Material:
     m_Ints: []
     m_Floats:
     - _CompareDebug: 0
-    - _Contribution: 0.85
+    - _Contribution: 0.512
     - _DebugMask: 0
     - _LutStrength: 1
-    - _Threshold: 0.5
-    - _ThresholdSharpness: 12
+    - _Threshold: 0.973
+    - _ThresholdSharpness: 11.45
     m_Colors: []
   m_BuildTextureStacks: []

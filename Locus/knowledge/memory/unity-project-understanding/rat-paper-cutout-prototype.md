@@ -10,21 +10,20 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779261693245
-updatedAt: 1779547584960
+updatedAt: 1779590401001
 ---
 
 # rat-paper-cutout-prototype
 
 ## Summary
-TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, PolygonFantasyHeroCharacters URP material repair notes, SampleScene Inscryption-style retro pipeline history, current `Assets/Tests/render.unity` retro composite/render setup, Phase 05 RetroFakeLit conversion pipeline, and Phase 07 PosterizeWithThreshold setup.
+TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, retro render validation scene wiring, Phase 05/07 render assets, and the new editor render control console entry points and config paths.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
-- Maintain only project-derived engineering understanding, including directory responsibilities, system entry points, asset relationships, runtime entry points, and config mappings
-- Write user-supplied design goals, gameplay intent, product direction, and solution decisions into Design
-- Prioritize directory responsibilities, core system entry points, key scenes, prefabs, ScriptableObjects, assemblies, and config mappings
-- Record verified asset relationships, runtime entry points, key dependencies, and common lookup paths
-- Remove temporary investigation traces, one-off task residue, unverified guesses, and expired cache
+- Maintain only project-derived engineering understanding, including directory responsibilities, system entry points, config mappings, key assets, and durable tool entry points
+- Write user-supplied design goals and agreed solution decisions into Design, not Memory
+- Prioritize stable lookup paths, renderer/material wiring, scene mappings, and reusable editor/runtime tooling notes
+- Remove temporary investigation traces, one-off guesses, and stale observations when contradicted by current project state
 <!-- locus:maintain-rules:end -->
 
 <!-- locus:body:start -->
@@ -55,4 +54,7 @@ TA prototype setup for rat paper-cutout tests, hard-cardboard cutout workflow, P
 - Phase 07 is active by default in `Assets/Settings/URP-HighFidelity-Renderer.asset` as FullScreenPassRendererFeature `RetroPosterizeThreshold`, ordered after SSAO and before `CardDungeon Retro Composite`, injected After Rendering Post Processing with Color requirement. Default params: `_Threshold=0.50`, `_ThresholdSharpness=12`, `_Contribution=0.85`, `_LutStrength=1`, LUT DirtyBrown, `_CompareDebug=0`, `_DebugMask=0`. Toggle comparison by disabling the `RetroPosterizeThreshold` renderer feature, or set `_CompareDebug=1` / `_DebugMask=1` on the material.
 - `Assets/Settings/SampleSceneProfile.asset` is used by the older `Global Volume` setup in `Assets/Scenes/SampleScene.unity`, not by `Assets/Tests/render.unity` unless a volume is added.
 - Creating TextMeshPro 3D labels caused Unity to import TMP essentials under `Assets/TextMesh Pro/`; keep this if the scene labels or future card text use TextMeshPro.
+- On 2026-05-23, a dedicated editor window control panel was added at `Assets/_Project/Editor/Rendering/CardDungeonRenderPipelineConsoleWindow.cs` with config asset `Assets/_Project/Editor/Rendering/CardDungeonRenderPipelineConsoleConfig.asset`, opened from menu `Tools/CardDungeon Rendering/项目渲染管线综合控制台`. It directly manages `Assets/Settings/URP-HighFidelity.asset`, `Assets/Settings/URP-HighFidelity-Renderer.asset`, `Assets/_Project/Rendering/Materials/M_RetroPosterizeThreshold_Phase07.mat`, `Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat`, and batch-shared Phase 05 values for all `CardDungeon/RetroFakeLit` materials under `Assets/_Project/Rendering/Materials/`.
+- The render console is organized into pages: Overview, Render Scale/URP baseline, Phase 05 RetroFakeLit, Phase 07 Posterize LUT, and Phase 08 Retro Composite. Each control includes user-facing explanation text about what increasing or decreasing the parameter changes.
+- Important project quirk: `Assets/Settings/URP-HighFidelity.asset` currently serializes `m_UpscalingFilter = 4`, while the runtime enum probe for `UpscalingFilterSelection` reported values 0=Auto, 1=Linear, 2=Point, 3=FSR. The new control panel therefore exposes raw option 4 as a special “current project value” choice instead of assuming a semantic mapping and rewriting it blindly.
 <!-- locus:body:end -->
