@@ -133,7 +133,7 @@ PrefabInstance:
     - target: {fileID: 5256126620345041070, guid: b81d6dc7a3f615648a2a06a319843199,
         type: 3}
       propertyPath: m_Name
-      value: RetroFakeLit_Card
+      value: "\u5361\u724C-RetroFakeLit"
       objectReference: {fileID: 0}
     - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
         type: 3}
@@ -226,7 +226,7 @@ PrefabInstance:
     - target: {fileID: 8128668236925612103, guid: ceb2a8c881c0d424e8b5f460ed1c2d62,
         type: 3}
       propertyPath: m_Name
-      value: bird
+      value: "\u6728\u8D28\u9E1F\u513F"
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: ceb2a8c881c0d424e8b5f460ed1c2d62,
         type: 3}
@@ -410,7 +410,7 @@ PrefabInstance:
     - target: {fileID: 8771091787928289351, guid: 37e0491e73760c5408788c76016fe3a0,
         type: 3}
       propertyPath: m_Name
-      value: treasure_chest_1k
+      value: "\u5B9D\u7BB1"
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -696,7 +696,7 @@ PrefabInstance:
     - target: {fileID: 8771091787928289351, guid: f6e3cae7240ca5c4a8e0fe7670cab840,
         type: 3}
       propertyPath: m_Name
-      value: concrete_cat_statue_1k
+      value: "\u5C0F\u732B2"
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -715,7 +715,7 @@ PrefabInstance:
     - target: {fileID: 8128668236925612103, guid: 12f771db1305ce14b96795d6ef1ae9c1,
         type: 3}
       propertyPath: m_Name
-      value: card (2)
+      value: "\u5361\u724C-\u539F\u7248\u6750\u8D28"
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
         type: 3}
@@ -804,7 +804,7 @@ PrefabInstance:
     - target: {fileID: 8128668236925612103, guid: de9381a7995b9c54e9b55eaea14d18e9,
         type: 3}
       propertyPath: m_Name
-      value: scene (2)
+      value: "\u5C0F\u4EBA\u96D5\u50CF"
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: de9381a7995b9c54e9b55eaea14d18e9,
         type: 3}
@@ -973,7 +973,7 @@ PrefabInstance:
     - target: {fileID: 8771091787928289351, guid: f6e3cae7240ca5c4a8e0fe7670cab840,
         type: 3}
       propertyPath: m_Name
-      value: concrete_cat_statue_1k (1)
+      value: "\u5C0F\u732B\u96D5\u50CF"
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1173,95 +1173,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1001 &759303036
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 8128668236925612103, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_Name
-      value: card
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalScale.x
-      value: 0.04
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalScale.y
-      value: 0.04
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalScale.z
-      value: 0.04
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -0.29099995
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.62600005
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -0.28999987
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-        type: 3}
-      propertyPath: m_ConstrainProportionsScale
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: -5645937942226959685, guid: 12f771db1305ce14b96795d6ef1ae9c1,
-    type: 3}
 --- !u!1 &803829453
 GameObject:
   m_ObjectHideFlags: 0
@@ -1410,7 +1321,7 @@ PrefabInstance:
     - target: {fileID: 8128668236925612103, guid: 12f771db1305ce14b96795d6ef1ae9c1,
         type: 3}
       propertyPath: m_Name
-      value: Normal_Card
+      value: "\u5361\u724C-\u539F\u7248\u6750\u8D282"
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: 12f771db1305ce14b96795d6ef1ae9c1,
         type: 3}
@@ -1574,7 +1485,7 @@ PrefabInstance:
     - target: {fileID: 8771091787928289351, guid: b83dd833f2ae33f43931d23a3a046676,
         type: 3}
       propertyPath: m_Name
-      value: carved_wooden_elephant_1k
+      value: "\u5927\u8C61\u96D5\u50CF"
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2263,7 +2174,7 @@ PrefabInstance:
     - target: {fileID: 8771091787928289351, guid: e0908c88a7c08b64bba09187caa3bcb1,
         type: 3}
       propertyPath: m_Name
-      value: table
+      value: "\u684C\u5B50"
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2494,7 +2405,7 @@ PrefabInstance:
     - target: {fileID: 8128668236925612103, guid: aa3207c492cf23a47ac84656822cbf17,
         type: 3}
       propertyPath: m_Name
-      value: scene (1)
+      value: "\u4EBA\u7269\u7ACB\u724C"
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: aa3207c492cf23a47ac84656822cbf17,
         type: 3}
@@ -2658,7 +2569,7 @@ PrefabInstance:
     - target: {fileID: 8771091787928289351, guid: 984f24ad44893924dbe7105b292adad8,
         type: 3}
       propertyPath: m_Name
-      value: brass_candleholders_1k
+      value: "\u70DB\u53F0"
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:
@@ -2684,7 +2595,7 @@ PrefabInstance:
     - target: {fileID: 8128668236925612103, guid: 09e936036ba912d4e8a46999d7d8cc68,
         type: 3}
       propertyPath: m_Name
-      value: scene
+      value: "\u72D0\u72F8\u96D5\u50CF"
       objectReference: {fileID: 0}
     - target: {fileID: 8897093224900880590, guid: 09e936036ba912d4e8a46999d7d8cc68,
         type: 3}
@@ -2773,7 +2684,7 @@ PrefabInstance:
     - target: {fileID: 3163425673147253509, guid: e8558b322e9bab14cb6e3ead82411f02,
         type: 3}
       propertyPath: m_Name
-      value: PineTree
+      value: "\u6811"
       objectReference: {fileID: 0}
     - target: {fileID: 4213253588168610236, guid: e8558b322e9bab14cb6e3ead82411f02,
         type: 3}
@@ -2836,7 +2747,6 @@ SceneRoots:
   m_Roots:
   - {fileID: 803829456}
   - {fileID: 1510481819}
-  - {fileID: 759303036}
   - {fileID: 822577994}
   - {fileID: 435638522}
   - {fileID: 1379513167}
