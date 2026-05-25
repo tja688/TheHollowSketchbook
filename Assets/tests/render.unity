@@ -2362,7 +2362,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1510481819}
   m_Layer: 0
-  m_Name: Lights
+  m_Name: Lights&RenderSettings
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2387,6 +2387,7 @@ Transform:
   - {fileID: 865702114}
   - {fileID: 1406556325}
   - {fileID: 935834222}
+  - {fileID: 1959286320}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1717711183
@@ -2611,12 +2612,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1959286318}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.421, y: -0.927, z: 0.161}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 1510481819}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1982109838
 PrefabInstance:
@@ -2800,5 +2801,4 @@ SceneRoots:
   - {fileID: 495858725}
   - {fileID: 506982645}
   - {fileID: 43858763}
-  - {fileID: 1959286320}
   - {fileID: 1950829609}
