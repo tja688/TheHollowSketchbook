@@ -5,12 +5,13 @@ path: project-mistake-note.md
 title: project-mistake-note
 injectMode: full
 summaryEnabled: false
+summaryCache: Verified project pitfalls and stale-note warnings.
 commandEnabled: false
 readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779245302335
-updatedAt: 1779245302337
+updatedAt: 1779672408426
 ---
 
 # project-mistake-note
@@ -24,4 +25,9 @@ updatedAt: 1779245302337
 <!-- locus:maintain-rules:end -->
 
 <!-- locus:body:start -->
+## Verified Pitfalls
+
+- URP `Assets/Settings/URP-HighFidelity.asset` has a project-specific serialized `m_UpscalingFilter = 4`; do not assume standard enum meaning without checking the current Unity/URP version.
+- The render scene `Assets/Tests/render.unity` now uses an active Volume profile; older notes claiming no Volume are stale.
+- `Assets/Notes` contains hand-authored tuning summaries that should be condensed into project memory rather than copied verbatim.
 <!-- locus:body:end -->

@@ -5,12 +5,13 @@ path: user-preference.md
 title: user-preference
 injectMode: rule
 summaryEnabled: false
+summaryCache: Stable user preferences captured from session behavior.
 commandEnabled: false
 readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779245302337
-updatedAt: 1779245302340
+updatedAt: 1779672342103
 ---
 
 # user-preference
@@ -24,4 +25,10 @@ updatedAt: 1779245302340
 <!-- locus:maintain-rules:end -->
 
 <!-- locus:body:start -->
+## User Preferences
+
+- Respond in Chinese by default unless the user asks otherwise.
+- Prefer concise, action-oriented answers.
+- When summarizing project memory, condense manual notes into short lookup-friendly points.
+- Separate stable project memory from temporary investigation notes.
 <!-- locus:body:end -->
