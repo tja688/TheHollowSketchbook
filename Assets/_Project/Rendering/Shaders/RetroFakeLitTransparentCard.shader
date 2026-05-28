@@ -1,9 +1,10 @@
-Shader "CardDungeon/RetroFakeLit"
+Shader "CardDungeon/RetroFakeLitTransparentCard"
 {
     Properties
     {
         _BaseMap ("Base Map", 2D) = "white" {}
         _BaseColor ("Base Color", Color) = (1,1,1,1)
+        _AlphaCutoff ("Alpha Cutoff", Range(0,0.1)) = 0.003
         _LightWrap ("Light Wrap", Range(0,1)) = 0
         _ShadowColor ("Shadow Color", Color) = (0.08,0.065,0.05,1)
         _AmbientStrength ("Ambient Strength", Range(0,1)) = 0.08
@@ -18,7 +19,7 @@ Shader "CardDungeon/RetroFakeLit"
         _EmissionMap ("Emission Map", 2D) = "black" {}
         _EmissionColor ("Emission Color", Color) = (1,0.65,0.35,1)
         _EmissionStrength ("Emission Strength", Range(0,8)) = 0
-        _UseRoundedClip ("Use Rounded Clip", Float) = 0
+        _UseRoundedClip ("Use Rounded Clip", Float) = 1
         _CardAspect ("Card Aspect", Float) = 0.714
         _CornerRadius ("Corner Radius", Range(0,0.25)) = 0.06
         _EdgeSoftness ("Edge Softness", Range(0.0005,0.02)) = 0.002
@@ -28,9 +29,19 @@ Shader "CardDungeon/RetroFakeLit"
 
     SubShader
     {
-        Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Opaque" "Queue"="Geometry" }
+        Tags
+        {
+            "RenderPipeline"="UniversalPipeline"
+            "RenderType"="Transparent"
+            "Queue"="Transparent"
+            "IgnoreProjector"="True"
+        }
         LOD 200
         Cull Back
+        ZWrite Off
+
+        // Premultiplied alpha: less likely to create black/dark fringes than SrcAlpha blending.
+        Blend One OneMinusSrcAlpha
 
         Pass
         {
@@ -54,6 +65,7 @@ Shader "CardDungeon/RetroFakeLit"
                 float4 _BaseMap_ST;
                 float4 _EmissionMap_ST;
                 half4 _BaseColor;
+                half _AlphaCutoff;
                 half _LightWrap;
                 half4 _ShadowColor;
                 half _AmbientStrength;
@@ -150,19 +162,30 @@ Shader "CardDungeon/RetroFakeLit"
 
             half4 Frag(Varyings input) : SV_Target
             {
+                half4 baseSample = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+
+                float roundedMask = 1.0;
                 float edgeMask = 0.0;
                 if (_UseRoundedClip > 0.5h)
                 {
                     float roundedDistance = RoundedRectSDF(input.maskUV, _CardAspect, _CornerRadius);
                     float clipSoftness = max(_EdgeSoftness, 0.0001);
-                    float roundedMask = 1.0 - smoothstep(0.0, clipSoftness, roundedDistance);
+                    roundedMask = 1.0 - smoothstep(0.0, clipSoftness, roundedDistance);
+
+                    // Make the outside of the rounded card truly invisible.
                     clip(roundedMask - 0.001);
+
                     edgeMask = 1.0 - saturate(abs(roundedDistance) / max(_EdgeDarkenWidth, 0.0001));
                 }
 
+                float alpha = saturate(baseSample.a * _BaseColor.a * roundedMask);
+
+                // Kill fully/near-fully transparent texels so their black RGB never contributes.
+                clip(alpha - _AlphaCutoff);
+
                 half3 normalWS = normalize(input.normalWS);
                 half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
-                half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb * _BaseColor.rgb;
+                half3 albedo = baseSample.rgb * _BaseColor.rgb;
                 half3 lighting = AccumulateLight(normalWS, input.positionWS, viewDirWS);
                 half3 emission = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, TRANSFORM_TEX(input.uv, _EmissionMap)).rgb * _EmissionColor.rgb * _EmissionStrength;
                 half3 color = albedo * lighting + emission;
@@ -171,11 +194,13 @@ Shader "CardDungeon/RetroFakeLit"
                 float distanceToCamera = distance(GetCameraPositionWS(), input.positionWS);
                 float fog = saturate((distanceToCamera - _FogStart) / max(0.001, _FogEnd - _FogStart));
                 color = lerp(color, _FogColor.rgb, fog);
-                return half4(saturate(color), 1.0h);
+
+                // Premultiply output color to match Blend One OneMinusSrcAlpha.
+                return half4(saturate(color) * alpha, alpha);
             }
             ENDHLSL
         }
     }
 
-    FallBack "Universal Render Pipeline/Lit"
+    FallBack Off
 }

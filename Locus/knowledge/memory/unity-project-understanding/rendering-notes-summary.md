@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779672335148
-updatedAt: 1779977579697
+updatedAt: 1779979900071
 ---
 
 # rendering-notes-summary
 
 ## Summary
-Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, and the card face printing prototypes.
+Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, the card face printing prototypes, and the new RetroFakeLit rounded-card clip path.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -48,6 +48,8 @@ Concise lookup cache for current render validation scene, comfort tuning, render
 - `Assets/Tests/render.unity/NewCard/render/CardFace_InscriptionPrototype` is a scene-level Quad overlay prototype for an Inscryption-like ink/cardboard print; it uses `Assets/_Project/Rendering/Materials/CardPrints/M_CardPrint_InscriptionPrototype.mat` and `Assets/_Project/Rendering/CardPrints/T_CardPrint_InscriptionPrototype.png`.
 - Workflow note: card title/icon/illustration are baked into the material base texture as paper/ink content so they receive scene lighting, RetroFakeLit, and full-screen render styling, rather than being displayed as UI overlays.
 - Current visual direction after the 2026-05-25 revision: preserve the original playing-card base texture and overlay borderless dark-brown doodle masks across the card face. Avoid re-filling the face with a new paper color or adding UI-like illustration/icon frames.
+- `Assets/_Project/Rendering/Shaders/RetroFakeLit.shader` now includes optional UV-based rounded card clipping and edge darkening controls (`_UseRoundedClip`, `_CardAspect`, `_CornerRadius`, `_EdgeSoftness`, `_EdgeDarkenWidth`, `_EdgeDarkenStrength`) so card prefabs can keep RetroFakeLit lighting while regaining rounded silhouettes without extra border geometry.
+- Current rounded-card test material: `Assets/_Project/Rendering/Materials/RetroFakeLitGenerated/M_RetroFakeLit_scene_card_colour_12f771db_Rounded.mat`, applied to `Assets/Arts/Prefabs/RetroFakeLits/卡牌-RetroFakeLit (1).prefab` and its scene instance in `Assets/Tests/render.unity`.
 
 ## Practical Maintenance Note
 
