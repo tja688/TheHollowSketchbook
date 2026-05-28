@@ -1,0 +1,11 @@
+Model Information:
+* title:	Four Cards Sun And Moon
+* source:	https://sketchfab.com/3d-models/four-cards-sun-and-moon-b19fb3b44a65418ebc97f4dab442c5f9
+* author:	DivineDragons (https://sketchfab.com/DivineDragons)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Four Cards Sun And Moon" (https://sketchfab.com/3d-models/four-cards-sun-and-moon-b19fb3b44a65418ebc97f4dab442c5f9) by DivineDragons (https://sketchfab.com/DivineDragons) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

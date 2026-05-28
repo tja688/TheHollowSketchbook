@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779672335148
-updatedAt: 1779723602458
+updatedAt: 1779977579697
 ---
 
 # rendering-notes-summary
 
 ## Summary
-Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, and the borderless card face printing prototype.
+Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, and the card face printing prototypes.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -45,6 +45,7 @@ Concise lookup cache for current render validation scene, comfort tuning, render
 - Editor bake entry: `Tools/CardDungeon Rendering/Bake Same Target Card Print` in `Assets/_Project/Editor/CardPrinting/CardPrintBakeUtility.cs`.
 - Prototype output paths: `Assets/_Project/Rendering/CardPrints/` for baked card face textures and `Assets/_Project/Rendering/Materials/CardPrints/` for RetroFakeLit card print materials.
 - `Assets/Tests/render.unity/卡牌-原版材质3` currently uses `Assets/_Project/Rendering/Materials/CardPrints/M_CardPrint_SameTarget.mat`, whose `_BaseMap` is the baked texture `Assets/_Project/Rendering/CardPrints/T_CardPrint_SameTarget.png`.
+- `Assets/Tests/render.unity/NewCard/render/CardFace_InscriptionPrototype` is a scene-level Quad overlay prototype for an Inscryption-like ink/cardboard print; it uses `Assets/_Project/Rendering/Materials/CardPrints/M_CardPrint_InscriptionPrototype.mat` and `Assets/_Project/Rendering/CardPrints/T_CardPrint_InscriptionPrototype.png`.
 - Workflow note: card title/icon/illustration are baked into the material base texture as paper/ink content so they receive scene lighting, RetroFakeLit, and full-screen render styling, rather than being displayed as UI overlays.
 - Current visual direction after the 2026-05-25 revision: preserve the original playing-card base texture and overlay borderless dark-brown doodle masks across the card face. Avoid re-filling the face with a new paper color or adding UI-like illustration/icon frames.
 

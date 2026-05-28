@@ -1,0 +1,11 @@
+Model Information:
+* title:	Toy Hammer
+* source:	https://sketchfab.com/3d-models/toy-hammer-a190e92f53814532bf2ef03ec56bd16a
+* author:	Pedro Perim (https://sketchfab.com/PedroPerim)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Toy Hammer" (https://sketchfab.com/3d-models/toy-hammer-a190e92f53814532bf2ef03ec56bd16a) by Pedro Perim (https://sketchfab.com/PedroPerim) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
