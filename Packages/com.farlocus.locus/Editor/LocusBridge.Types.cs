@@ -36,6 +36,32 @@ namespace Locus
         }
 
         [Serializable]
+        private class StartAssetDragRequest
+        {
+            public LocusEditorWindow.DroppedAssetRef[] refs;
+        }
+
+        [Serializable]
+        private class CaptureViewportRequest
+        {
+            public string target;
+            public string windowTitle;
+        }
+
+        [Serializable]
+        private class CaptureViewportResponse
+        {
+            public string target;
+            public string title;
+            public string path;
+            public int width;
+            public int height;
+            public int originalWidth;
+            public int originalHeight;
+            public string mimeType;
+        }
+
+        [Serializable]
         private class ExecuteCodeProgressSnapshot
         {
             public bool active;
@@ -234,7 +260,7 @@ namespace Locus
             EditorGUIUtility.PingObject(target);
         }
 
-        private static GameObject ResolveSceneObject(string scenePath, string objectPath)
+        public static GameObject ResolveSceneObject(string scenePath, string objectPath)
         {
             string normalizedScenePath = NormalizePath(scenePath);
             string normalizedObjectPath = NormalizeObjectPath(objectPath);
