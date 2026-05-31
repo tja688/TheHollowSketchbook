@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779672335148
-updatedAt: 1779979900071
+updatedAt: 1780234352438
 ---
 
 # rendering-notes-summary
 
 ## Summary
-Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, the card face printing prototypes, and the new RetroFakeLit rounded-card clip path.
+Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, card-face printing prototypes, and the current RetroFakeLit card/text rendering constraints.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -50,6 +50,8 @@ Concise lookup cache for current render validation scene, comfort tuning, render
 - Current visual direction after the 2026-05-25 revision: preserve the original playing-card base texture and overlay borderless dark-brown doodle masks across the card face. Avoid re-filling the face with a new paper color or adding UI-like illustration/icon frames.
 - `Assets/_Project/Rendering/Shaders/RetroFakeLit.shader` now includes optional UV-based rounded card clipping and edge darkening controls (`_UseRoundedClip`, `_CardAspect`, `_CornerRadius`, `_EdgeSoftness`, `_EdgeDarkenWidth`, `_EdgeDarkenStrength`) so card prefabs can keep RetroFakeLit lighting while regaining rounded silhouettes without extra border geometry.
 - Current rounded-card test material: `Assets/_Project/Rendering/Materials/RetroFakeLitGenerated/M_RetroFakeLit_scene_card_colour_12f771db_Rounded.mat`, applied to `Assets/Arts/Prefabs/RetroFakeLits/卡牌-RetroFakeLit (1).prefab` and its scene instance in `Assets/Tests/render.unity`.
+- `Assets/Tests/render.unity/最终版卡牌-RetroFakeLit` currently tests a child world-space Canvas + `TextMeshProUGUI` title overlay on top of the card mesh, while the card itself uses `Assets/_Project/Rendering/Materials/RetroFakeLitTransparentCard.mat` (`Transparent`, queue 3000, `ZWrite Off`). This setup is angle-fragile: the card and the TMP UI both render in transparent queue without depth writes, so ordering becomes camera-dependent and the text can appear to pop behind the card or be swallowed when the viewing angle changes.
+- Practical direction for stable “text glued to card face”: prefer baking card title/graphics into the card face texture/material, or render them on a dedicated front-face mesh/quad using an opaque or alpha-clipped shader with a tiny normal offset. Avoid relying on world-space UGUI sitting almost coplanar over a transparent card surface.
 
 ## Practical Maintenance Note
 

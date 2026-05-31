@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.coplaydev.unity-mcp": "file:D:/Unity Assist/unity mcp coplay/unity-mcp-9.6.8/unity-mcp-9.6.8/MCPForUnity",
+    "com.coplaydev.unity-mcp": "file:C:/Users/jinji/Documents/GitHub/案例制教学——大炮防线/unity-mcp-beta/unity-mcp-beta/MCPForUnity",
     "com.unity.cinemachine": "2.10.7",
     "com.unity.collab-proxy": "2.12.4",
     "com.unity.feature.2d": "2.0.1",
