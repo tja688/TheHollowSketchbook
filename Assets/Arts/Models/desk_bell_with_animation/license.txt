@@ -1,0 +1,11 @@
+Model Information:
+* title:	Desk Bell With Animation
+* source:	https://sketchfab.com/3d-models/desk-bell-with-animation-4a405f1b0d094682861bb88bae880576
+* author:	mturski2 (https://sketchfab.com/mturski2)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Desk Bell With Animation" (https://sketchfab.com/3d-models/desk-bell-with-animation-4a405f1b0d094682861bb88bae880576) by mturski2 (https://sketchfab.com/mturski2) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

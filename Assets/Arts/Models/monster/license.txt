@@ -1,0 +1,11 @@
+Model Information:
+* title:	monster
+* source:	https://sketchfab.com/3d-models/monster-aa437b7eaf2e4f90be6a9c1d07470402
+* author:	sikoro (https://sketchfab.com/sikorodz05)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "monster" (https://sketchfab.com/3d-models/monster-aa437b7eaf2e4f90be6a9c1d07470402) by sikoro (https://sketchfab.com/sikorodz05) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
