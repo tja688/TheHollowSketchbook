@@ -18,6 +18,11 @@ namespace Game.Presentation.Bootstrap
 
         private CombatManager _combatManager;
 
+        private void OnDestroy()
+        {
+            _combatManager?.Reset();
+        }
+
         private async void Start()
         {
             if (_startOnPlay)

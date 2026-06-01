@@ -19,6 +19,7 @@ namespace Game.Presentation.Combat.UI
             }
 
             _player = player ?? throw new ArgumentNullException(nameof(player));
+            Subscribe();
             Refresh();
         }
 
@@ -39,10 +40,25 @@ namespace Game.Presentation.Combat.UI
             }
         }
 
+        private void Subscribe()
+        {
+            if (_player?.PlayerCombatState != null)
+            {
+                _player.PlayerCombatState.EnergyChanged += OnEnergyChanged;
+            }
+        }
+
         private void Unsubscribe()
         {
-            // PlayerCombatState is recreated each combat, so we don't subscribe to it directly.
-            // If future energy change events are added, subscribe here.
+            if (_player?.PlayerCombatState != null)
+            {
+                _player.PlayerCombatState.EnergyChanged -= OnEnergyChanged;
+            }
+        }
+
+        private void OnEnergyChanged(int oldValue, int newValue)
+        {
+            Refresh();
         }
 
         private void OnDestroy()

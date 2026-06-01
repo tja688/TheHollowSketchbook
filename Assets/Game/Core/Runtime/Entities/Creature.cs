@@ -78,7 +78,9 @@ namespace Game.Core.Entities
                 HpChanged?.Invoke(oldValue, CurrentHp);
                 if (oldValue > 0 && CurrentHp <= 0)
                 {
+                    _ = Game.Core.Hooks.Hook.BeforeCreatureDied(this);
                     Died?.Invoke(this);
+                    _ = Game.Core.Hooks.Hook.AfterCreatureDied(this);
                 }
             }
         }

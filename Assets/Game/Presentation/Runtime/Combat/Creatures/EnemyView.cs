@@ -115,6 +115,10 @@ namespace Game.Presentation.Combat.Creatures
 
         private void OnHpChanged(int oldValue, int newValue)
         {
+            if (newValue < oldValue)
+            {
+                PlayHitReaction();
+            }
             Refresh();
         }
 

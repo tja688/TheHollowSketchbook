@@ -349,6 +349,7 @@ namespace Game.Presentation.Combat
             intentGo.transform.localPosition = new Vector3(0f, 2.8f, 0f);
             var intentCanvas = intentGo.AddComponent<Canvas>();
             intentCanvas.renderMode = RenderMode.WorldSpace;
+            intentCanvas.worldCamera = Camera.main;
             intentCanvas.sortingOrder = 11;
             var intentRt = intentGo.GetComponent<RectTransform>();
             intentRt.sizeDelta = new Vector2(1.5f, 0.5f);
@@ -480,6 +481,7 @@ namespace Game.Presentation.Combat
                 _combatManager.CombatEnded -= OnCombatEnded;
                 _combatManager.EnemyIntentRolled -= OnEnemyIntentRolled;
                 _combatManager.CreaturesChanged -= OnCreaturesChanged;
+                _combatManager.Reset();
             }
         }
     }

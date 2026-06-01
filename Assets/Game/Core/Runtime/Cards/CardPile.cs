@@ -57,9 +57,11 @@ namespace Game.Core.Cards
                 return;
             }
 
-            if (card.CurrentPile != null)
+            CardPile fromPile = card.CurrentPile;
+            if (fromPile != null)
             {
-                card.CurrentPile.Remove(card);
+                _ = Game.Core.Hooks.Hook.BeforeCardMovedPile(card, fromPile, this);
+                fromPile.Remove(card);
             }
 
             if (index < 0 || index > _cards.Count)
@@ -74,6 +76,10 @@ namespace Game.Core.Cards
             card.SetCurrentPile(this);
             CardAdded?.Invoke(card);
             NotifyContentsChanged();
+            if (fromPile != null)
+            {
+                _ = Game.Core.Hooks.Hook.AfterCardMovedPile(card, fromPile, this);
+            }
         }
 
         public bool Remove(CardModel card)

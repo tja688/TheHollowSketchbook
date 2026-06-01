@@ -26,24 +26,41 @@ namespace Game.Core.Entities
         public CardPile ExhaustPile { get; }
         public CardPile PlayPile { get; }
 
+        public event System.Action<int, int> EnergyChanged;
+
         public void ResetEnergy(int maxEnergy)
         {
+            int oldValue = Energy;
             MaxEnergy = maxEnergy;
             Energy = maxEnergy;
+            if (oldValue != Energy)
+            {
+                EnergyChanged?.Invoke(oldValue, Energy);
+            }
         }
 
         public void SpendEnergy(int amount)
         {
+            int oldValue = Energy;
             Energy -= amount;
             if (Energy < 0)
             {
                 Energy = 0;
             }
+            if (oldValue != Energy)
+            {
+                EnergyChanged?.Invoke(oldValue, Energy);
+            }
         }
 
         public void GainEnergy(int amount)
         {
+            int oldValue = Energy;
             Energy += amount;
+            if (oldValue != Energy)
+            {
+                EnergyChanged?.Invoke(oldValue, Energy);
+            }
         }
 
         public void ClearPiles()

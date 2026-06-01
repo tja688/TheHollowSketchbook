@@ -243,7 +243,7 @@ namespace Game.Presentation.Input
             }
         }
 
-        public async void EndDrag()
+        public void EndDrag()
         {
             if (_draggedCard == null)
             {
@@ -304,7 +304,7 @@ namespace Game.Presentation.Input
             }
             else
             {
-                await SnapBackAsync(cardView, _originalPosition, _originalRotation, _originalScale);
+                _ = SnapBackAsync(cardView, _originalPosition, _originalRotation, _originalScale);
                 TransitionTo(DragState.None);
             }
         }

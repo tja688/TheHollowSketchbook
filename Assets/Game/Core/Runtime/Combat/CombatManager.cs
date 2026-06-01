@@ -132,19 +132,22 @@ namespace Game.Core.Combat
 
         internal static void MoveCardToResultPile(Player player, CardModel card, PileType resultPile)
         {
-            switch (resultPile)
+            CardPile targetPile = resultPile switch
             {
-                case PileType.Exhaust:
-                    player.PlayerCombatState.ExhaustPile.Add(card);
-                    break;
-                case PileType.Discard:
-                    player.PlayerCombatState.DiscardPile.Add(card);
-                    break;
-                case PileType.Play:
-                    player.PlayerCombatState.PlayPile.Add(card);
-                    break;
-                default:
-                    throw new GameException("Unsupported result pile: " + resultPile);
+                PileType.Exhaust => player.PlayerCombatState.ExhaustPile,
+                PileType.Discard => player.PlayerCombatState.DiscardPile,
+                PileType.Play => player.PlayerCombatState.PlayPile,
+                _ => null
+            };
+
+            if (targetPile == null)
+            {
+                throw new GameException("Unsupported result pile: " + resultPile);
+            }
+
+            if (card.CurrentPile != targetPile)
+            {
+                targetPile.Add(card);
             }
         }
     }
@@ -211,12 +214,14 @@ namespace Game.Core.Combat
         public async Task StartCombatAsync()
         {
             EnsureState();
+            await Hook.BeforeCombatStart(State);
             await StartPlayerTurnAsync();
         }
 
         public async Task StartPlayerTurnAsync()
         {
             EnsureState();
+            await Hook.BeforeTurnStart(State);
             State.CurrentSide = CombatSide.Player;
             State.IsPlayPhase = true;
 
@@ -232,7 +237,7 @@ namespace Game.Core.Combat
             PlayerActionsDisabledChanged?.Invoke(false);
             TurnStarted?.Invoke(State);
             CreaturesChanged?.Invoke(State);
-            await Task.CompletedTask;
+            await Hook.AfterTurnStart(State);
         }
 
         public void RequestEndTurn(Player player)
@@ -262,15 +267,18 @@ namespace Game.Core.Combat
                 return;
             }
 
+            await Hook.BeforeTurnEnd(State);
             DiscardHands();
             TurnEnded?.Invoke(State);
             CreaturesChanged?.Invoke(State);
+            await Hook.AfterTurnEnd(State);
             await ExecuteEnemyTurnAsync();
         }
 
         public async Task ExecuteEnemyTurnAsync()
         {
             EnsureState();
+            await Hook.BeforeTurnStart(State);
             State.CurrentSide = CombatSide.Enemy;
             State.IsPlayPhase = false;
             TurnStarted?.Invoke(State);
@@ -314,6 +322,7 @@ namespace Game.Core.Combat
             }
 
             TurnEnded?.Invoke(State);
+            await Hook.AfterTurnEnd(State);
             State.RoundNumber++;
             await CheckWinConditionAsync();
             if (!State.IsCombatEnded)
@@ -352,6 +361,7 @@ namespace Game.Core.Combat
                 State.IsPlayPhase = false;
                 PlayerActionsDisabledChanged?.Invoke(true);
                 CombatEnded?.Invoke(State);
+                await Hook.AfterCombatEnd(State);
                 return true;
             }
 
@@ -364,6 +374,7 @@ namespace Game.Core.Combat
                 PlayerActionsDisabledChanged?.Invoke(true);
                 CombatWon?.Invoke(State);
                 CombatEnded?.Invoke(State);
+                await Hook.AfterCombatEnd(State);
                 return true;
             }
 

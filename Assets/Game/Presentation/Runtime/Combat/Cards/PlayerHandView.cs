@@ -157,7 +157,12 @@ namespace Game.Presentation.Combat.Cards
             }
         }
 
-        private async void AnimateExitAndRecycle(CardView view)
+        private void AnimateExitAndRecycle(CardView view)
+        {
+            _ = AnimateExitAndRecycleAsync(view);
+        }
+
+        private async Task AnimateExitAndRecycleAsync(CardView view)
         {
             Vector3 exitPos = GetExitPosition();
 
