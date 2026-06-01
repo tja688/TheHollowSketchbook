@@ -1,12 +1,5 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Game.Content;
-using Game.Core;
-using Game.Core.Combat;
-using Game.Core.Entities;
-using Game.Core.Models;
-using Game.Core.Random;
-using Game.Core.Runs;
+using Game.Presentation.RunFlow;
 using UnityEngine;
 
 namespace Game.Presentation.Bootstrap
@@ -15,57 +8,45 @@ namespace Game.Presentation.Bootstrap
     {
         [SerializeField] private int _seed = 12345;
         [SerializeField] private bool _startOnPlay = true;
+        [SerializeField] private bool _continueSavedRunIfPresent = true;
 
-        private CombatManager _combatManager;
+        private PrototypeRunController _runController;
 
         private void OnDestroy()
         {
-            _combatManager?.Reset();
+            if (_runController != null)
+            {
+                Destroy(_runController.gameObject);
+            }
         }
 
-        private async void Start()
+        private void Start()
         {
             if (_startOnPlay)
             {
-                await StartPrototypeCombatAsync();
+                StartPrototypeRun();
             }
         }
 
-        [ContextMenu("Start Prototype Combat")]
-        public void StartPrototypeCombat()
-        {
-            _ = StartPrototypeCombatAsync();
-        }
-
-        public async Task StartPrototypeCombatAsync()
+        [ContextMenu("Start Prototype Run")]
+        public void StartPrototypeRun()
         {
             StarterContentRegistry.RegisterAll();
 
-            Player player = new Player(ModelDb.Get<CharacterModel>(new ModelId("Character", "PrototypeHero")));
-            IRng rng = new DeterministicRng(_seed);
-            RunState run = new RunState(
-                _seed,
-                rng,
-                new[] { player },
-                new[] { ModelDb.Get<ActModel>(new ModelId("Act", "PrototypeAct")) });
-
-            EncounterModel encounter = ModelDb.Get<EncounterModel>(new ModelId("Encounter", "PrototypeCultistEncounter"));
-            List<Creature> enemies = new List<Creature>(encounter.EnemyIds.Length);
-            for (int i = 0; i < encounter.EnemyIds.Length; i++)
+            if (_runController != null)
             {
-                EnemyModel enemyModel = ModelDb.Get<EnemyModel>(encounter.EnemyIds[i]);
-                enemies.Add(new Creature(enemyModel, enemyModel.MaxHp, enemyModel.MaxHp));
+                Destroy(_runController.gameObject);
             }
 
-            CombatState combat = new CombatState(run, encounter, new[] { player }, enemies);
-            _combatManager = new CombatManager();
-            _combatManager.SetUpCombat(combat);
+            GameObject controllerGo = new GameObject("PrototypeRunController");
+            _runController = controllerGo.AddComponent<PrototypeRunController>();
+            _runController.StartPrototypeRun(_seed, _continueSavedRunIfPresent);
+        }
 
-            var controllerGo = new GameObject("CombatPrototypeController");
-            var controller = controllerGo.AddComponent<Combat.CombatPrototypeController>();
-            controller.Bind(_combatManager);
-
-            await _combatManager.StartCombatAsync();
+        [ContextMenu("Clear Prototype Run Save")]
+        public void ClearPrototypeRunSave()
+        {
+            new Game.Core.Saves.SaveManager().DeleteCurrentRun();
         }
     }
 }

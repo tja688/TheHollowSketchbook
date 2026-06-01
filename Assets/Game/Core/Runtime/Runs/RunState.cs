@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Game.Core.Entities;
+using Game.Core.Map;
 using Game.Core.Random;
+using Game.Core.Rooms;
 
 namespace Game.Core.Runs
 {
@@ -21,6 +23,9 @@ namespace Game.Core.Runs
 
         public int CurrentActIndex { get; set; }
         public bool IsGameOver { get; set; }
+        public ActMap Map { get; set; }
+        public MapCoord? CurrentMapCoord { get; set; }
+        public AbstractRoom CurrentRoom { get; set; }
 
         public ActModel CurrentAct
         {

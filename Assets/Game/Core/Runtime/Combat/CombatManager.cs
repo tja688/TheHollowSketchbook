@@ -8,6 +8,7 @@ using Game.Core.Combat.Commands;
 using Game.Core.Entities;
 using Game.Core.Logging;
 using Game.Core.Random;
+using Game.Core.Hooks;
 
 namespace Game.Core.Combat
 {

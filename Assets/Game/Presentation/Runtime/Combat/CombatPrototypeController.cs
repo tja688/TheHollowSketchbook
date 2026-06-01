@@ -25,6 +25,7 @@ namespace Game.Presentation.Combat
         private readonly List<EnemyView> _enemyViews = new List<EnemyView>();
         private Transform _enemyRoot;
         private Transform _playArea;
+        private Transform _uiRoot;
 
         public void Bind(CombatManager combatManager)
         {
@@ -42,6 +43,7 @@ namespace Game.Presentation.Combat
             {
                 var camGo = new GameObject("MainCamera");
                 var cam = camGo.AddComponent<Camera>();
+                cam.transform.SetParent(transform, false);
                 cam.transform.position = new Vector3(0f, 5f, -8f);
                 cam.transform.rotation = Quaternion.Euler(45f, 0f, 0f);
                 cam.clearFlags = CameraClearFlags.SolidColor;
@@ -52,12 +54,14 @@ namespace Game.Presentation.Combat
 
             // Light
             var lightGo = new GameObject("DirectionalLight");
+            lightGo.transform.SetParent(transform, false);
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Directional;
             light.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
 
             // Play area (ground plane for raycast)
             _playArea = new GameObject("PlayArea").transform;
+            _playArea.SetParent(transform, false);
             _playArea.position = new Vector3(0f, 0f, 2f);
             var playAreaCollider = _playArea.gameObject.AddComponent<BoxCollider>();
             playAreaCollider.size = new Vector3(20f, 0.1f, 10f);
@@ -66,18 +70,22 @@ namespace Game.Presentation.Combat
 
             // Enemy root
             _enemyRoot = new GameObject("EnemyRoot").transform;
+            _enemyRoot.SetParent(transform, false);
             _enemyRoot.position = new Vector3(0f, 0f, 3f);
 
             // Hand anchor
             var handAnchor = new GameObject("HandAnchor").transform;
+            handAnchor.SetParent(transform, false);
             handAnchor.position = new Vector3(0f, 0.5f, -2f);
 
             // Draw pile anchor
             var drawAnchor = new GameObject("DrawPileAnchor").transform;
+            drawAnchor.SetParent(transform, false);
             drawAnchor.position = new Vector3(-4f, 0.5f, -2f);
 
             // Discard pile anchor
             var discardAnchor = new GameObject("DiscardPileAnchor").transform;
+            discardAnchor.SetParent(transform, false);
             discardAnchor.position = new Vector3(4f, 0.5f, -2f);
 
             // Card prefab template
@@ -128,9 +136,10 @@ namespace Game.Presentation.Combat
             // UI Overlay Canvas
             var uiGo = new GameObject("CombatUI");
             uiGo.transform.SetParent(transform, false);
+            _uiRoot = uiGo.transform;
             var canvas = uiGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 10;
+            canvas.sortingOrder = 150;
             var scaler = uiGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -206,6 +215,7 @@ namespace Game.Presentation.Combat
         private CardView CreateCardPrefab()
         {
             var go = new GameObject("CardViewPrefab");
+            go.transform.SetParent(transform, false);
             go.SetActive(false);
             var cardView = go.AddComponent<CardView>();
             // Awake() will auto-create visuals via EnsureVisuals/EnsureCollider
@@ -450,7 +460,7 @@ namespace Game.Presentation.Combat
         private void ShowCombatResult(string text)
         {
             var go = new GameObject("CombatResult", typeof(RectTransform));
-            go.transform.SetParent(FindObjectOfType<Canvas>()?.transform, false);
+            go.transform.SetParent(_uiRoot, false);
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
