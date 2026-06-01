@@ -30,16 +30,30 @@ namespace Game.Presentation.RunFlow
 
         public void StartPrototypeRun(int seed)
         {
+            StartPrototypeRun(seed, false);
+        }
+
+        public void StartPrototypeRun(int seed, bool continueSavedRunIfPresent)
+        {
             _seed = seed;
             StarterContentRegistry.RegisterAll();
             BuildUi();
 
-            _saveManager = new SaveManager();
+            _saveManager = new SaveManager(Application.persistentDataPath);
             _runManager = new RunManager(saveManager: _saveManager);
             _runManager.RoomEntered += OnRoomEntered;
             _runManager.RoomCompleted += OnRoomCompleted;
             _runManager.MapChanged += OnMapChanged;
             _runManager.RunEnded += OnRunEnded;
+
+            if (continueSavedRunIfPresent)
+            {
+                RunState loaded = _runManager.LoadRun();
+                if (loaded != null)
+                {
+                    return;
+                }
+            }
 
             CharacterModel character = ModelDb.Get<CharacterModel>(new ModelId("Character", "PrototypeHero"));
             IReadOnlyList<ActModel> acts = new[] { ModelDb.Get<ActModel>(new ModelId("Act", "PrototypeAct")) };

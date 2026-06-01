@@ -50,12 +50,20 @@ namespace Game.Core.Rewards
 
         private static IReadOnlyList<CardModel> GenerateCardChoices(IRng rng, int count)
         {
-            List<ModelId> pool = new List<ModelId>(CardRewardPool);
+            List<CardModel> pool = new List<CardModel>(ModelDb.All<CardModel>());
+            for (int i = pool.Count - 1; i >= 0; i--)
+            {
+                if (pool[i].Rarity == CardRarity.Basic)
+                {
+                    pool.RemoveAt(i);
+                }
+            }
+
             rng.Shuffle(pool);
             List<CardModel> cards = new List<CardModel>(count);
             for (int i = 0; i < count && i < pool.Count; i++)
             {
-                cards.Add(ModelDb.CreateMutable<CardModel>(pool[i]));
+                cards.Add(pool[i].CloneMutable<CardModel>());
             }
 
             return cards;

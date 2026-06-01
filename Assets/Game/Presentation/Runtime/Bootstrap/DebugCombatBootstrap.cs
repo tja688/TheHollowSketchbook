@@ -46,7 +46,7 @@ namespace Game.Presentation.Bootstrap
         [ContextMenu("Clear Prototype Run Save")]
         public void ClearPrototypeRunSave()
         {
-            new Game.Core.Saves.SaveManager().DeleteCurrentRun();
+            new Game.Core.Saves.SaveManager(Application.persistentDataPath).DeleteCurrentRun();
         }
     }
 }

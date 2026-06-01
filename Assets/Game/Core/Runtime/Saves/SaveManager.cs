@@ -14,12 +14,17 @@ namespace Game.Core.Saves
 {
     public sealed class SaveManager
     {
-        private static readonly string SaveFilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "TheHollowSketchbook",
-            "prototype-current-run.dat");
+        private readonly string _saveFilePath;
 
         private static RunSaveDto _cachedRun;
+
+        public SaveManager(string saveDirectory = null)
+        {
+            _saveFilePath = Path.Combine(
+                saveDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "TheHollowSketchbook",
+                "prototype-current-run.dat");
+        }
 
         public void SaveCurrentRun(Runs.RunState run)
         {
@@ -62,33 +67,33 @@ namespace Game.Core.Saves
         public void DeleteCurrentRun()
         {
             _cachedRun = null;
-            if (File.Exists(SaveFilePath))
+            if (File.Exists(_saveFilePath))
             {
-                File.Delete(SaveFilePath);
+                File.Delete(_saveFilePath);
             }
         }
 
-        private static void PersistToDisk(RunSaveDto dto)
+        private void PersistToDisk(RunSaveDto dto)
         {
-            string directory = Path.GetDirectoryName(SaveFilePath);
+            string directory = Path.GetDirectoryName(_saveFilePath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
             }
 
-            using FileStream stream = new FileStream(SaveFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            using FileStream stream = new FileStream(_saveFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
             using BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8);
             RunSaveBinarySerializer.Write(writer, dto);
         }
 
-        private static RunSaveDto LoadFromDisk()
+        private RunSaveDto LoadFromDisk()
         {
-            if (!File.Exists(SaveFilePath))
+            if (!File.Exists(_saveFilePath))
             {
                 return null;
             }
 
-            using FileStream stream = new FileStream(SaveFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using FileStream stream = new FileStream(_saveFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using BinaryReader reader = new BinaryReader(stream, Encoding.UTF8);
             return RunSaveBinarySerializer.Read(reader);
         }
@@ -107,6 +112,7 @@ namespace Game.Core.Saves
             WriteNullable(writer, dto.Map, WriteMap);
             WriteNullable(writer, dto.CurrentRoom, WriteRoom);
             WriteList(writer, dto.Players, WritePlayer);
+            WriteList(writer, dto.ActIds, WriteActId);
         }
 
         public static RunSaveDto Read(BinaryReader reader)
@@ -124,6 +130,11 @@ namespace Game.Core.Saves
             };
 
             dto.Players = ReadList(reader, ReadPlayer);
+            if (reader.BaseStream.Position < reader.BaseStream.Length)
+            {
+                dto.ActIds = ReadList(reader, ReadActId);
+            }
+
             return dto;
         }
 
@@ -289,6 +300,21 @@ namespace Game.Core.Saves
             };
         }
 
+        private static void WriteActId(BinaryWriter writer, ActIdSaveDto dto)
+        {
+            writer.Write(dto.Category ?? string.Empty);
+            writer.Write(dto.Entry ?? string.Empty);
+        }
+
+        private static ActIdSaveDto ReadActId(BinaryReader reader)
+        {
+            return new ActIdSaveDto
+            {
+                Category = reader.ReadString(),
+                Entry = reader.ReadString()
+            };
+        }
+
         private static void WriteRngState(BinaryWriter writer, RngStateDto dto)
         {
             writer.Write(dto.Value);
@@ -360,6 +386,11 @@ namespace Game.Core.Saves
                 dto.Players.Add(CapturePlayer(run.Players[i]));
             }
 
+            for (int i = 0; i < run.Acts.Count; i++)
+            {
+                dto.ActIds.Add(new ActIdSaveDto { Category = run.Acts[i].Id.Category, Entry = run.Acts[i].Id.Entry });
+            }
+
             return dto;
         }
 
@@ -376,10 +407,18 @@ namespace Game.Core.Saves
                 players.Add(RestorePlayer(dto.Players[i]));
             }
 
-            List<ActModel> acts = new List<ActModel>
+            List<ActModel> acts = new List<ActModel>();
+            if (dto.ActIds != null && dto.ActIds.Count > 0)
             {
-                ModelDb.Get<ActModel>(new ModelId("Act", "PrototypeAct"))
-            };
+                for (int i = 0; i < dto.ActIds.Count; i++)
+                {
+                    acts.Add(ModelDb.Get<ActModel>(new ModelId(dto.ActIds[i].Category, dto.ActIds[i].Entry)));
+                }
+            }
+            else
+            {
+                acts.Add(ModelDb.Get<ActModel>(new ModelId("Act", "PrototypeAct")));
+            }
 
             Runs.RunState run = new Runs.RunState(dto.Seed, new DeterministicRng(new RngState(dto.RngState != null ? dto.RngState.Value : (uint)dto.Seed)), players, acts)
             {

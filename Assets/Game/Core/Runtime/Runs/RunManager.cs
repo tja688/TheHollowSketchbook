@@ -29,19 +29,6 @@ namespace Game.Core.Runs
         public event Action<AbstractRoom> RoomCompleted;
         public event Action<RunState> RunEnded;
 
-        public RunState StartNewRun(CharacterModel character, int seed)
-        {
-            if (character == null)
-            {
-                throw new ArgumentNullException(nameof(character));
-            }
-
-            Player player = new Player(character);
-            RunState run = new RunState(seed, new DeterministicRng(seed), new[] { player }, new ActModel[0]);
-            State = run;
-            return run;
-        }
-
         public RunState StartNewRun(CharacterModel character, int seed, IReadOnlyList<ActModel> acts)
         {
             if (character == null)

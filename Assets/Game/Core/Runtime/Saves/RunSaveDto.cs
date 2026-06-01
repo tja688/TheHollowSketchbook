@@ -18,6 +18,14 @@ namespace Game.Core.Saves
         public MapSaveDto Map;
         public RoomSaveDto CurrentRoom;
         public List<PlayerSaveDto> Players = new List<PlayerSaveDto>();
+        public List<ActIdSaveDto> ActIds = new List<ActIdSaveDto>();
+    }
+
+    [Serializable]
+    public sealed class ActIdSaveDto
+    {
+        public string Category;
+        public string Entry;
     }
 
     [Serializable]
