@@ -160,6 +160,12 @@ namespace Game.Core.Combat.Commands
             target.RemovePower(power);
             return Task.CompletedTask;
         }
+
+        public static void TakeDamage(Creature target, int amount)
+        {
+            int hpLoss = Math.Max(0, amount);
+            target.SetCurrentHp(Math.Max(0, target.CurrentHp - hpLoss));
+        }
     }
 
     public static class PlayerCmd

@@ -164,7 +164,7 @@ namespace Game.Core.Runs
         {
             foreach (MapPoint candidate in parent.Children)
             {
-                if (ReferenceEquals(candidate, child))
+                if (candidate.Coord == child.Coord)
                 {
                     return true;
                 }

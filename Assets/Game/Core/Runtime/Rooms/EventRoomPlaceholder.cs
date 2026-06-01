@@ -1,3 +1,4 @@
+using Game.Core.Combat.Commands;
 using Game.Core.Entities;
 using Game.Core.Map;
 
@@ -16,7 +17,7 @@ namespace Game.Core.Rooms
         public void TakeRisk(Player player)
         {
             player.GainGold(GoldDelta);
-            player.Creature.SetCurrentHp(player.Creature.CurrentHp - HpLoss);
+            CreatureCmd.TakeDamage(player.Creature, HpLoss);
         }
     }
 }
