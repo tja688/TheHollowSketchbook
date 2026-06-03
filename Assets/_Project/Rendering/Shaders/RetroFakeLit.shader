@@ -4,6 +4,11 @@ Shader "CardDungeon/RetroFakeLit"
     {
         _BaseMap ("Base Map", 2D) = "white" {}
         _BaseColor ("Base Color", Color) = (1,1,1,1)
+        _PrintMap ("Print Map", 2D) = "white" {}
+        [NoScaleOffset] _PrintMask ("Print Mask", 2D) = "white" {}
+        _PrintColor ("Print Color", Color) = (1,1,1,1)
+        _PrintStrength ("Print Strength", Range(0,1)) = 0
+        _PrintRotation90 ("Print Rotate 90", Float) = 0
         _LightWrap ("Light Wrap", Range(0,1)) = 0
         _ShadowColor ("Shadow Color", Color) = (0.08,0.065,0.05,1)
         _AmbientStrength ("Ambient Strength", Range(0,1)) = 0.08
@@ -48,12 +53,18 @@ Shader "CardDungeon/RetroFakeLit"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_PrintMap); SAMPLER(sampler_PrintMap);
+            TEXTURE2D(_PrintMask); SAMPLER(sampler_PrintMask);
             TEXTURE2D(_EmissionMap); SAMPLER(sampler_EmissionMap);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
+                float4 _PrintMap_ST;
                 float4 _EmissionMap_ST;
                 half4 _BaseColor;
+                half4 _PrintColor;
+                half _PrintStrength;
+                half _PrintRotation90;
                 half _LightWrap;
                 half4 _ShadowColor;
                 half _AmbientStrength;
@@ -148,6 +159,17 @@ Shader "CardDungeon/RetroFakeLit"
                 return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - safeRadius;
             }
 
+            float2 RotatePrintUv90(float2 uv)
+            {
+                return float2(1.0 - uv.y, uv.x);
+            }
+
+            half GetPrintMask(float2 uv)
+            {
+                half4 maskSample = SAMPLE_TEXTURE2D(_PrintMask, sampler_PrintMask, uv);
+                return saturate(max(max(maskSample.r, maskSample.g), maskSample.b) * maskSample.a);
+            }
+
             half4 Frag(Varyings input) : SV_Target
             {
                 float edgeMask = 0.0;
@@ -163,6 +185,13 @@ Shader "CardDungeon/RetroFakeLit"
                 half3 normalWS = normalize(input.normalWS);
                 half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
                 half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb * _BaseColor.rgb;
+
+                float2 printSourceUV = _PrintRotation90 > 0.5h ? RotatePrintUv90(input.maskUV) : input.maskUV;
+                float2 printUV = TRANSFORM_TEX(printSourceUV, _PrintMap);
+                half4 printSample = SAMPLE_TEXTURE2D(_PrintMap, sampler_PrintMap, printUV);
+                half printAlpha = saturate(printSample.a * GetPrintMask(printUV) * _PrintColor.a * _PrintStrength);
+                albedo = lerp(albedo, printSample.rgb * _PrintColor.rgb, printAlpha);
+
                 half3 lighting = AccumulateLight(normalWS, input.positionWS, viewDirWS);
                 half3 emission = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, TRANSFORM_TEX(input.uv, _EmissionMap)).rgb * _EmissionColor.rgb * _EmissionStrength;
                 half3 color = albedo * lighting + emission;
