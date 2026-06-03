@@ -28,13 +28,18 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EmissionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
+        m_Texture: {fileID: 2800000, guid: 427331a78eb7d6f47b164c71f58ad6d0, type: 3}
+        m_Scale: {x: 3, y: 3}
+        m_Offset: {x: -0.43, y: -0.07}
     m_Ints: []
     m_Floats:
     - _AmbientStrength: 0.18
-    - _EmissionStrength: 0
+    - _CardAspect: 0.714
+    - _CornerRadius: 0.06
+    - _EdgeDarkenStrength: 0
+    - _EdgeDarkenWidth: 0.02
+    - _EdgeSoftness: 0.002
+    - _EmissionStrength: 0.46
     - _FogEnd: 5.5
     - _FogStart: 2.2
     - _LightWrap: 0
@@ -42,9 +47,10 @@ Material:
     - _RampStrength: 0.28
     - _SpecPower: 18
     - _SpecStrength: 0.025
+    - _UseRoundedClip: 0
     m_Colors:
     - _BaseColor: {r: 0.78, g: 0.62, b: 0.42, a: 1}
-    - _EmissionColor: {r: 1, g: 0.65, b: 0.34999996, a: 1}
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 0.76862746}
     - _FogColor: {r: 0.008, g: 0.006, b: 0.004, a: 1}
     - _ShadowColor: {r: 0.105, g: 0.075, b: 0.052, a: 1}
     - _SpecColor: {r: 0.2, g: 0.15, b: 0.09, a: 1}
