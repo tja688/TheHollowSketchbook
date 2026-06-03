@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779672335148
-updatedAt: 1780489409779
+updatedAt: 1780499375355
 ---
 
 # rendering-notes-summary
 
 ## Summary
-Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, card-face printing prototypes, and the current RetroFakeLit card/text rendering constraints.
+Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, card-face printing prototypes, the TestPlane TMP surface prototype, and current RetroFakeLit card/text rendering constraints.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -52,6 +52,13 @@ Concise lookup cache for current render validation scene, comfort tuning, render
 - Current rounded-card test material: `Assets/_Project/Rendering/Materials/RetroFakeLitGenerated/M_RetroFakeLit_scene_card_colour_12f771db_Rounded.mat`, applied to `Assets/Arts/Prefabs/RetroFakeLits/卡牌-RetroFakeLit (1).prefab` and its scene instance in `Assets/Tests/render.unity`.
 - `Assets/Tests/render.unity/最终版卡牌-RetroFakeLit` currently tests a child world-space Canvas + `TextMeshProUGUI` title overlay on top of the card mesh, while the card itself uses `Assets/_Project/Rendering/Materials/RetroFakeLitTransparentCard.mat` (`Transparent`, queue 3000, `ZWrite Off`). This setup is angle-fragile: the card and the TMP UI both render in transparent queue without depth writes, so ordering becomes camera-dependent and the text can appear to pop behind the card or be swallowed when the viewing angle changes.
 - Practical direction for stable “text glued to card face”: prefer baking card title/graphics into the card face texture/material, or render them on a dedicated front-face mesh/quad using an opaque or alpha-clipped shader with a tiny normal offset. Avoid relying on world-space UGUI sitting almost coplanar over a transparent card surface.
+
+## Plane TMP Surface Prototype
+
+- `Assets/Tests/render.unity/TestPlane` is a transparent text-surface prototype: its own `MeshRenderer` is disabled, while child `TestPlane/PlaneText` renders world-space `TextMeshPro` only.
+- Runtime controller script: `Assets/Scripts/StrayPathCore/UI/PlaneTextDisplay.cs`. It exposes `SetText`, `AppendText`, `DeleteLastCharacter`, `ClearText`, `FadeIn`, `FadeOut`, `FadeTo`, and optional Legacy Input `Input.inputString` capture for dynamic typing/deleting.
+- Chinese TMP font asset for this prototype: `Assets/TextMesh Pro/Resources/Fonts & Materials/MaShanZheng SDF.asset`, generated from `Assets/Arts/Fronts/Ma_Shan_Zheng/MaShanZheng-Regular.ttf` and set to dynamic atlas population.
+- Implementation note: this is good for a transparent “floating text on plane bounds” test. For final card/desk printing that must receive scene lighting like ink, prefer texture/material baking or a dedicated alpha-clipped mesh/quad.
 
 ## RetroFakeLit Desk Print Constraint
 
