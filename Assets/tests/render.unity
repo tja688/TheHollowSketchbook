@@ -373,74 +373,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 148997137}
   m_Mesh: {fileID: 6836727041412336787, guid: 3f40aff34c4ed954d91301533e9b264f, type: 3}
---- !u!1001 &152266954
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 5256126620345041070, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_Name
-      value: "\u6700\u7EC8\u7248\u5361\u724C-RetroFakeLit (2)"
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -0.8715
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.8164
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -0.0243
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.6109055
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0.20447412
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0.70643026
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0.2931571
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 41.607
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 623.726
-      objectReference: {fileID: 0}
-    - target: {fileID: 9141152939812089914, guid: b81d6dc7a3f615648a2a06a319843199,
-        type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 5.317
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: b81d6dc7a3f615648a2a06a319843199, type: 3}
 --- !u!1 &189941999
 GameObject:
   m_ObjectHideFlags: 0
@@ -1739,7 +1671,7 @@ Transform:
   m_GameObject: {fileID: 668342342}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 0.0019869995, z: -0, w: -0.99999803}
-  m_LocalPosition: {x: 0.684, y: 0.602, z: 0.252}
+  m_LocalPosition: {x: 0.685, y: 0.602, z: 0.002}
   m_LocalScale: {x: -0.07, y: 0.01, z: 0.04}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1794,8 +1726,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4279785921
-  m_fontColor: {r: 0.7584905, g: 0.34991238, b: 0.095884636, a: 1}
+    rgba: 3296629164
+  m_fontColor: {r: 0.6754716, g: 0.5668972, b: 0.4932217, a: 0.76862746}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -4982,7 +4914,6 @@ SceneRoots:
   - {fileID: 1379513167}
   - {fileID: 1858417310}
   - {fileID: 43858763}
-  - {fileID: 152266954}
   - {fileID: 2077240817}
   - {fileID: 1977758383}
   - {fileID: 7856539830996017201}
