@@ -7,6 +7,7 @@ namespace Game.Core.Domain.Grid
     public sealed class GridCell
     {
         private readonly List<CardInstance> _cards = new List<CardInstance>();
+        private readonly IReadOnlyList<CardInstance> _stackView;
 
         public GridCell(GridCoord coord)
         {
@@ -15,6 +16,7 @@ namespace Game.Core.Domain.Grid
                 throw new ArgumentException("Grid cell coord must be valid.", nameof(coord));
             }
 
+            _stackView = _cards.AsReadOnly();
             Coord = coord;
         }
 
@@ -37,7 +39,7 @@ namespace Game.Core.Domain.Grid
 
         public IReadOnlyList<CardInstance> StackView
         {
-            get { return _cards; }
+            get { return _stackView; }
         }
 
         internal void PushTop(CardInstance card)

@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1780290415998
-updatedAt: 1780648463967
+updatedAt: 1780652486655
 ---
 
 # sts-prototype-phase1-core
 
 ## Summary
-当前 Unity 项目 Core/Presentation 结构与 P0 领域层入口、命名空间、关键规则、测试位置与最新 SubmitIntent 串行化约束速查。
+当前 Unity 项目 Core/Presentation 结构与 P0 领域层入口、命名空间、关键规则、测试位置，以及最新 SubmitIntent 串行化与存档恢复边界速查。
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -39,9 +39,11 @@ updatedAt: 1780648463967
 #### 项目级领域基础设施 P0
 
 - P0 九宫格领域层位于 `Assets/Scripts/Game/Core/Runtime/Domain`，入口是 `Game.Core.Domain.DomainFacade` 与 `DomainActionContext`。
-- 主要命名空间：`Domain.Grid`（`GridCoord`、`GridQueries`、`GridCell`、`GridState`、`GridOperationResult`）、`Domain.Cards`（`CardInstanceId`、`CardType`、`CardZone`、`CardModel`、`CardInstance`）、`Domain.Deck`（`DungeonDeck`）、`Domain.Interaction`（`PlayerIntent`、`IntentPreview`、`IntentValidator`）、`Domain.Actions`、`Domain.Events`、`Domain.Combat`、`Domain.Rooms`（`RoomClearChecker`）、`Domain.Validation`。
+- 主要命名空间：`Domain.Grid`（`GridCoord`、`GridQueries`、`GridCell`、`GridState`、`GridOperationResult`）、`Domain.Cards`（`CardInstanceId`、`CardType`、`CardZone`、`CardModel`、`CardInstance`）、`Domain.Deck`（`DungeonDeck`）、`Domain.Interaction`（`PlayerIntent`、`IntentPreview`、`IntentValidator`）、`Domain.Actions`、`Domain.Events`、`Domain.Combat`、`Domain.Rooms`（`RoomClearChecker`、`RunProgressionState`）、`Domain.Validation`。
 - P0 规则：九宫格 1~9 行优先；玩家默认格 8；玩家移动到空格计行动并揭示正交相邻顶牌；互动正面顶牌计行动且玩家位置不变；移除顶牌后下方顶牌自动翻开；怪物移除给 10 金币；机关接触伤害忽略玩家防御；怪物清空后发出 `RoomCleared`。
 - `DomainFacade.SubmitIntentAsync()` 现已串行化：外部并发提交会排队等待同一 `SemaphoreSlim` 通道，Hook/生命周期中的同提交链重入会返回 `IntentRejected("SubmitIntentReentrant")`，`ActionExecutor.ExecuteAllAsync()` 会复用同一个运行中的 drain task，避免多个 executor 并发消费同一 `ActionQueueSet`。
-- P0 测试程序集是 `Assets/Scripts/Game/Core/Tests/Game.Core.Tests.asmdef`，测试文件是 `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs`，覆盖坐标、堆叠、移动/揭示、互动、非法意图、移除级联、伤害、清场、不变量。
+- `Assets/Scripts/Game/Core/Runtime/Saves/DomainSaveAdapter.cs` 当前已覆盖 Grid、DungeonDeck、Inventory、Relic、ChoiceSession、房间层/节点/类型、路线待选项与 RNG 恢复；`DomainActionContext.ReplaceGrid()` 会同步更新 `CombatResolution` 内部 Grid 引用，避免读档后 Combat 指向旧 Grid。
+- 当前领域存档仍未形成“完整设计闭环”：`PendingTrigger` 只是 DTO 占位未接入真实运行态，玩家多层属性/词条也还未进入 Domain 存档范围，不能对外宣称已完全落地。
+- P0 测试程序集是 `Assets/Scripts/Game/Core/Tests/Game.Core.Tests.asmdef`，测试文件是 `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs`，当前 `[Test]` 数量 28，已覆盖坐标、堆叠、移动/揭示、互动、非法意图、移除级联、伤害、清场、不变量、SubmitIntent 串行化、存档基础 round-trip、Combat Grid 引用切换、Deck/Inventory/Choice/Progression/RNG 恢复。
 - 项目开发规范文档：`Assets/Notes/项目开发规范.md`；L1 AI 执行手册：`Assets/Notes/L1开发AI快速执行手册.md`。
 <!-- locus:body:end -->

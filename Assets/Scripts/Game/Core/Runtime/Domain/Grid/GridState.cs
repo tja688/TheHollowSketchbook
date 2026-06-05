@@ -11,10 +11,12 @@ namespace Game.Core.Domain.Grid
     public sealed class GridState
     {
         private readonly GridCell[] _cells = new GridCell[9];
+        private readonly IReadOnlyList<GridCell> _cellView;
         private readonly Dictionary<CardInstanceId, CardInstance> _cardsById = new Dictionary<CardInstanceId, CardInstance>();
 
         public GridState()
         {
+            _cellView = Array.AsReadOnly(_cells);
             IReadOnlyList<GridCoord> coords = GridQueries.AllCoordsRowMajor();
             for (int i = 0; i < coords.Count; i++)
             {
@@ -24,7 +26,7 @@ namespace Game.Core.Domain.Grid
 
         public IReadOnlyList<GridCell> Cells
         {
-            get { return _cells; }
+            get { return _cellView; }
         }
 
         public CardInstance PlayerCard
@@ -110,6 +112,11 @@ namespace Game.Core.Domain.Grid
             }
 
             return card;
+        }
+
+        public void TrackCard(CardInstance card)
+        {
+            Register(card);
         }
 
         public bool IsEmpty(GridCoord coord)

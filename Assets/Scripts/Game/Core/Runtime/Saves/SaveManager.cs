@@ -147,7 +147,7 @@ namespace Game.Core.Saves
 
             if (dto.SaveVersion >= 3)
             {
-                dto.RoomDomainState = ReadNullable(reader, ReadRoomDomainState);
+                dto.RoomDomainState = ReadNullable(reader, r => ReadRoomDomainState(r, dto.SaveVersion));
             }
 
             dto.Players = ReadList(reader, ReadPlayer);
@@ -347,23 +347,62 @@ namespace Game.Core.Saves
 
         private static void WriteRoomDomainState(BinaryWriter writer, RoomDomainStateSaveDto dto)
         {
+            writer.Write(dto.RoomType);
+            writer.Write(dto.LayerIndex);
+            writer.Write(dto.NodeIndex);
             writer.Write(dto.ActionCounterValue);
             writer.Write(dto.PlayerGold);
+            writer.Write(dto.RngState.HasValue);
+            if (dto.RngState.HasValue)
+            {
+                writer.Write(dto.RngState.Value);
+            }
             WriteNullable(writer, dto.Grid, WriteGridState);
+            WriteNullable(writer, dto.DungeonDeck, WriteDungeonDeck);
             WriteNullable(writer, dto.ItemInventory, WritePlayerInventory);
             WriteNullable(writer, dto.RelicInventory, WriteRelicInventory);
+            WriteList(writer, dto.ActiveChoices, WriteChoiceSession);
+            WriteList(writer, dto.PendingTriggerCardInstanceIds, (w, id) => w.Write(id));
+            WriteList(writer, dto.RouteChoiceRoomTypes, (w, roomType) => w.Write(roomType));
         }
 
-        private static RoomDomainStateSaveDto ReadRoomDomainState(BinaryReader reader)
+        private static RoomDomainStateSaveDto ReadRoomDomainState(BinaryReader reader, int saveVersion)
         {
-            return new RoomDomainStateSaveDto
+            if (saveVersion <= 3)
             {
+                return new RoomDomainStateSaveDto
+                {
+                    ActionCounterValue = reader.ReadInt32(),
+                    PlayerGold = reader.ReadInt32(),
+                    Grid = ReadNullable(reader, ReadGridState),
+                    ItemInventory = ReadNullable(reader, ReadPlayerInventory),
+                    RelicInventory = ReadNullable(reader, ReadRelicInventory)
+                };
+            }
+
+            RoomDomainStateSaveDto dto = new RoomDomainStateSaveDto
+            {
+                RoomType = reader.ReadInt32(),
+                LayerIndex = reader.ReadInt32(),
+                NodeIndex = reader.ReadInt32(),
                 ActionCounterValue = reader.ReadInt32(),
-                PlayerGold = reader.ReadInt32(),
-                Grid = ReadNullable(reader, ReadGridState),
-                ItemInventory = ReadNullable(reader, ReadPlayerInventory),
-                RelicInventory = ReadNullable(reader, ReadRelicInventory)
+                PlayerGold = reader.ReadInt32()
             };
+
+            bool hasRngState = reader.ReadBoolean();
+            if (hasRngState)
+            {
+                dto.RngState = reader.ReadUInt32();
+            }
+
+            dto.Grid = ReadNullable(reader, ReadGridState);
+            dto.DungeonDeck = ReadNullable(reader, ReadDungeonDeck);
+            dto.ItemInventory = ReadNullable(reader, ReadPlayerInventory);
+            dto.RelicInventory = ReadNullable(reader, ReadRelicInventory);
+            dto.ActiveChoices = ReadList(reader, ReadChoiceSession);
+            dto.PendingTriggerCardInstanceIds = ReadList(reader, r => r.ReadUInt32());
+            dto.RouteChoiceRoomTypes = ReadList(reader, r => r.ReadInt32());
+            return dto;
         }
 
         private static void WriteGridState(BinaryWriter writer, GridStateSaveDto dto)
@@ -483,6 +522,40 @@ namespace Game.Core.Saves
             };
         }
 
+        private static void WriteDungeonDeck(BinaryWriter writer, DungeonDeckSaveDto dto)
+        {
+            WriteList(writer, dto.CardInstanceIds, (w, id) => w.Write(id));
+        }
+
+        private static DungeonDeckSaveDto ReadDungeonDeck(BinaryReader reader)
+        {
+            return new DungeonDeckSaveDto
+            {
+                CardInstanceIds = ReadList(reader, r => r.ReadUInt32())
+            };
+        }
+
+        private static void WriteChoiceSession(BinaryWriter writer, ChoiceSessionSaveDto dto)
+        {
+            writer.Write(dto.SessionId ?? string.Empty);
+            writer.Write(dto.OptionCount);
+            writer.Write(dto.ChoiceKind ?? string.Empty);
+            writer.Write(dto.IsResolved);
+            writer.Write(dto.SelectedOptionIndex);
+        }
+
+        private static ChoiceSessionSaveDto ReadChoiceSession(BinaryReader reader)
+        {
+            return new ChoiceSessionSaveDto
+            {
+                SessionId = reader.ReadString(),
+                OptionCount = reader.ReadInt32(),
+                ChoiceKind = reader.ReadString(),
+                IsResolved = reader.ReadBoolean(),
+                SelectedOptionIndex = reader.ReadInt32()
+            };
+        }
+
         private static void WriteRelicInventory(BinaryWriter writer, RelicInventorySaveDto dto)
         {
             WriteList(writer, dto.PassiveRelics, WriteActId);
@@ -509,7 +582,7 @@ namespace Game.Core.Saves
         {
             RunSaveDto dto = new RunSaveDto
             {
-                SaveVersion = 3, // Bumped to 3 after adding RoomDomainState serialization
+                SaveVersion = 4,
                 Seed = run.Seed,
                 CurrentActIndex = run.CurrentActIndex,
                 IsGameOver = run.IsGameOver,

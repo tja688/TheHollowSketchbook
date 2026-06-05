@@ -1,0 +1,11 @@
+Model Information:
+* title:	low poly skeleton character
+* source:	https://sketchfab.com/3d-models/low-poly-skeleton-character-67918e36de88491cb30b8ccc851b9f34
+* author:	Kavinda.Attanayake (https://sketchfab.com/Kavinda.Attanayake)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "low poly skeleton character" (https://sketchfab.com/3d-models/low-poly-skeleton-character-67918e36de88491cb30b8ccc851b9f34) by Kavinda.Attanayake (https://sketchfab.com/Kavinda.Attanayake) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -10,7 +10,7 @@ namespace Game.Core.Domain.Combat
 {
     public sealed class CombatResolution
     {
-        private readonly GridState _grid;
+        private GridState _grid;
 
         public CombatResolution(GridState grid)
         {
@@ -18,6 +18,11 @@ namespace Game.Core.Domain.Combat
         }
 
         public DomainActionContext Domain { get; set; }
+
+        public void SetGrid(GridState grid)
+        {
+            _grid = grid ?? throw new ArgumentNullException(nameof(grid));
+        }
 
         public async Task<DamageResult> ApplyDamageAsync(DamageInfo info, ICollection<DomainEvent> events)
         {

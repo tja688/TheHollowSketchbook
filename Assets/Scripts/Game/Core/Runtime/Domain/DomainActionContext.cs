@@ -36,10 +36,17 @@ namespace Game.Core.Domain
         public RoomClearChecker RoomClearChecker { get; }
         public DungeonDeck DungeonDeck { get; set; }
         public IRng Rng { get; set; }
+        public RunProgressionState Progression { get; set; }
         public PlayerInventory ItemInventory { get; }
         public RelicInventory Relics { get; }
         public ChoiceSessionStore ChoiceSessions { get; }
         public int PlayerGold { get; private set; }
+
+        public void ReplaceGrid(GridState grid)
+        {
+            Grid = grid ?? throw new ArgumentNullException(nameof(grid));
+            Combat.SetGrid(grid);
+        }
 
         public void SetPlayerGold(int value)
         {

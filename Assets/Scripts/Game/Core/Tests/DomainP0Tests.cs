@@ -168,6 +168,38 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void DomainCollections_DoNotExposeMutableBackingStores()
+        {
+            GridState grid = NewGridWithPlayer();
+            CardInstance item = NewCard(2, CardType.Item);
+            PlayerInventory inventory = new PlayerInventory();
+            DungeonDeck deck = new DungeonDeck();
+
+            grid.AddCardToGrid(item, GridCoord.FromCellIndex(5), true);
+            inventory.Store(NewCard(3, CardType.Item));
+            deck.AddToTop(NewCard(4, CardType.Monster, hp: 6));
+
+            Assert.IsFalse(grid.Cells is GridCell[]);
+            Assert.IsFalse(grid.GetStack(GridCoord.FromCellIndex(5)) is List<CardInstance>);
+            Assert.IsFalse(inventory.Items is List<CardInstance>);
+            Assert.IsFalse(deck.Cards is List<CardInstance>);
+        }
+
+        [Test]
+        public void InvariantValidator_CatchesCrossZoneDuplicateCardInRoomDomainState()
+        {
+            GridState grid = NewGridWithPlayer();
+            CardInstance item = NewCard(2, CardType.Item);
+            grid.AddCardToGrid(item, GridCoord.FromCellIndex(5), true);
+            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+            context.ItemInventory.Store(item);
+
+            IReadOnlyList<InvariantViolation> violations = new DomainInvariantValidator().Validate(context);
+
+            Assert.IsTrue(violations.Any(violation => violation.Code == "CrossZoneDuplicateCard"));
+        }
+
+        [Test]
         public void CombatResolution_FirstStrike_MonsterAttacksFirst()
         {
             Await(async () =>
@@ -379,21 +411,17 @@ namespace Game.Core.Tests
             original.ActionCounter.Increment(new MovePlayerIntent(GridCoord.FromCellIndex(9)));
             original.SetPlayerGold(42);
 
-            // Capture
             Game.Core.Saves.RoomDomainStateSaveDto dto = Game.Core.Saves.DomainSaveAdapter.Capture(original);
 
-            // Restore into fresh context
-            GridState freshGrid = NewGridWithPlayer(); // dummy grid to be replaced
+            GridState freshGrid = NewGridWithPlayer();
             DomainActionContext restored = new DomainActionContext(freshGrid, new PlayerActionCounter());
             Game.Core.Saves.DomainSaveAdapter.Restore(dto, restored);
 
-            // Verify Grid restored
             Assert.IsNotNull(restored.Grid);
             Assert.AreEqual(3, restored.Grid.AllKnownCards.Count());
             Assert.AreEqual(42, restored.PlayerGold);
             Assert.AreEqual(1, restored.ActionCounter.Value);
 
-            // Verify monster restored with state
             CardInstance restoredMonster = restored.Grid.AllKnownCards.First(c => c.CardType == CardType.Monster);
             Assert.AreEqual(6, restoredMonster.MaxHp);
             Assert.AreEqual(2, restoredMonster.Attack);
@@ -401,18 +429,88 @@ namespace Game.Core.Tests
             Assert.AreEqual(GridCoord.FromCellIndex(5), restoredMonster.Coord.Value);
             Assert.IsFalse(restoredMonster.IsFaceUp);
 
-            // Verify trap restored
             CardInstance restoredTrap = restored.Grid.AllKnownCards.First(c => c.CardType == CardType.Trap);
             Assert.AreEqual(4, restoredTrap.MaxHp);
             Assert.AreEqual(1, restoredTrap.Defense);
             Assert.AreEqual(3, restoredTrap.ContactDamageToPlayer);
             Assert.IsTrue(restoredTrap.IsFaceUp);
 
-            // Verify player restored
             CardInstance restoredPlayer = restored.Grid.PlayerCard;
             Assert.AreEqual(20, restoredPlayer.MaxHp);
             Assert.AreEqual(5, restoredPlayer.Attack);
             Assert.AreEqual(GridCoord.FromCellIndex(8), restoredPlayer.Coord.Value);
+        }
+
+        [Test]
+        public void SaveRestore_ReplacesCombatGridReference()
+        {
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 0, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 4, attack: 0, defense: 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+
+                DomainActionContext original = new DomainActionContext(grid, new PlayerActionCounter());
+                Game.Core.Saves.RoomDomainStateSaveDto dto = Game.Core.Saves.DomainSaveAdapter.Capture(original);
+
+                DomainActionContext restored = new DomainActionContext(NewGridWithPlayer(), new PlayerActionCounter());
+                Game.Core.Saves.DomainSaveAdapter.Restore(dto, restored);
+
+                CardInstance restoredPlayer = restored.Grid.PlayerCard;
+                CardInstance restoredMonster = restored.Grid.AllKnownCards.First(c => c.CardType == CardType.Monster);
+                await restored.Combat.ResolvePlayerVsMonsterAsync(restoredPlayer, restoredMonster, new List<DomainEvent>());
+
+                Assert.AreEqual(0, restoredMonster.CurrentHp);
+            });
+        }
+
+        [Test]
+        public void SaveRestore_PreservesDeckInventoryChoicesProgressionAndRng()
+        {
+            GridState grid = NewGridWithPlayer();
+            DomainActionContext original = new DomainActionContext(grid, new PlayerActionCounter());
+
+            CardInstance deckCard = NewCard(2, CardType.Monster, hp: 7, attack: 3, defense: 1);
+            DungeonDeck deck = new DungeonDeck();
+            deck.AddToTop(deckCard);
+            original.DungeonDeck = deck;
+
+            CardInstance item = NewCard(3, CardType.Item);
+            original.ItemInventory.Store(item);
+            original.ChoiceSessions.Open("route", 3, "RouteChoice");
+            original.Progression = new RunProgressionState(2, 4, RoomType.Gold, new[] { RoomType.Chest, RoomType.Shop });
+
+            DeterministicRng rng = new DeterministicRng(12345);
+            rng.NextInt(0, 10);
+            original.Rng = rng;
+
+            Game.Core.Saves.RoomDomainStateSaveDto dto = Game.Core.Saves.DomainSaveAdapter.Capture(original);
+
+            DomainActionContext restored = new DomainActionContext(NewGridWithPlayer(), new PlayerActionCounter())
+            {
+                Rng = new DeterministicRng(1)
+            };
+            Game.Core.Saves.DomainSaveAdapter.Restore(dto, restored);
+
+            Assert.IsNotNull(restored.DungeonDeck);
+            Assert.AreEqual(1, restored.DungeonDeck.Count);
+            Assert.AreEqual(deckCard.InstanceId, restored.DungeonDeck.Cards[0].InstanceId);
+            Assert.AreEqual(CardZone.DungeonDeck, restored.DungeonDeck.Cards[0].Zone);
+            Assert.AreEqual(1, restored.ItemInventory.Count);
+            Assert.AreEqual(item.InstanceId, restored.ItemInventory.Items[0].InstanceId);
+            Assert.IsTrue(restored.ChoiceSessions.TryGet("route", out ChoiceSession restoredSession));
+            Assert.IsFalse(restoredSession.IsResolved);
+            Assert.AreEqual("RouteChoice", restoredSession.ChoiceKind);
+            Assert.IsNotNull(restored.Progression);
+            Assert.AreEqual(2, restored.Progression.LayerIndex);
+            Assert.AreEqual(4, restored.Progression.NodeIndex);
+            Assert.AreEqual(RoomType.Gold, restored.Progression.CurrentRoomType);
+            CollectionAssert.AreEqual(new[] { RoomType.Chest, RoomType.Shop }, restored.Progression.PendingChoices);
+
+            DeterministicRng expectedRng = new DeterministicRng(new RngState(dto.RngState.Value));
+            Assert.AreEqual(expectedRng.NextInt(0, 1000), restored.Rng.NextInt(0, 1000));
         }
 
         [Test]

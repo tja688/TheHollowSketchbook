@@ -1,9 +1,15 @@
+using System;
 using System.Collections.Generic;
 using Game.Core.Domain;
 using Game.Core.Domain.Cards;
+using Game.Core.Domain.Deck;
 using Game.Core.Domain.Grid;
+using Game.Core.Domain.Interaction;
 using Game.Core.Domain.Inventory;
+using Game.Core.Domain.Rooms;
 using Game.Core.Models;
+using Game.Core.Random;
+using Game.Core.Rooms;
 
 namespace Game.Core.Saves
 {
@@ -20,14 +26,27 @@ namespace Game.Core.Saves
                 return null;
             }
 
-            return new RoomDomainStateSaveDto
+            RoomDomainStateSaveDto dto = new RoomDomainStateSaveDto
             {
                 ActionCounterValue = domain.ActionCounter.Value,
                 PlayerGold = domain.PlayerGold,
-                Grid = CaptureGrid(domain.Grid),
+                Grid = CaptureGrid(domain.Grid, EnumerateKnownCards(domain)),
+                DungeonDeck = CaptureDungeonDeck(domain.DungeonDeck),
                 ItemInventory = CaptureItemInventory(domain.ItemInventory),
-                RelicInventory = CaptureRelicInventory(domain.Relics)
+                RelicInventory = CaptureRelicInventory(domain.Relics),
+                ActiveChoices = CaptureChoiceSessions(domain.ChoiceSessions),
+                RngState = domain.Rng != null ? domain.Rng.CaptureState().Value : null
             };
+
+            if (domain.Progression != null)
+            {
+                dto.RoomType = (int)domain.Progression.CurrentRoomType;
+                dto.LayerIndex = domain.Progression.LayerIndex;
+                dto.NodeIndex = domain.Progression.NodeIndex;
+                dto.RouteChoiceRoomTypes = CaptureRouteChoices(domain.Progression.PendingChoices);
+            }
+
+            return dto;
         }
 
         public static void Restore(RoomDomainStateSaveDto dto, DomainActionContext domain)
@@ -40,15 +59,58 @@ namespace Game.Core.Saves
             GridState restoredGrid = RestoreGrid(dto.Grid);
             if (restoredGrid != null)
             {
-                domain.Grid = restoredGrid;
+                domain.ReplaceGrid(restoredGrid);
             }
 
             domain.ActionCounter.RestoreValue(dto.ActionCounterValue);
             domain.SetPlayerGold(dto.PlayerGold);
+            RestoreRng(dto.RngState, domain);
 
             Dictionary<uint, CardInstance> cardLookup = BuildCardLookup(domain.Grid);
+            domain.DungeonDeck = RestoreDungeonDeck(dto.DungeonDeck, cardLookup);
             RestoreItemInventory(dto.ItemInventory, domain.ItemInventory, cardLookup);
             RestoreRelicInventory(dto.RelicInventory, domain.Relics);
+            RestoreChoiceSessions(dto.ActiveChoices, domain.ChoiceSessions);
+            RestoreProgression(dto, domain);
+        }
+
+        private static IEnumerable<CardInstance> EnumerateKnownCards(DomainActionContext domain)
+        {
+            HashSet<uint> seen = new HashSet<uint>();
+            if (domain.Grid != null)
+            {
+                foreach (CardInstance card in domain.Grid.AllKnownCards)
+                {
+                    if (seen.Add(card.InstanceId.Value))
+                    {
+                        yield return card;
+                    }
+                }
+            }
+
+            if (domain.DungeonDeck != null)
+            {
+                for (int i = 0; i < domain.DungeonDeck.Cards.Count; i++)
+                {
+                    CardInstance card = domain.DungeonDeck.Cards[i];
+                    if (seen.Add(card.InstanceId.Value))
+                    {
+                        yield return card;
+                    }
+                }
+            }
+
+            if (domain.ItemInventory != null)
+            {
+                for (int i = 0; i < domain.ItemInventory.Items.Count; i++)
+                {
+                    CardInstance card = domain.ItemInventory.Items[i];
+                    if (seen.Add(card.InstanceId.Value))
+                    {
+                        yield return card;
+                    }
+                }
+            }
         }
 
         private static Dictionary<uint, CardInstance> BuildCardLookup(GridState grid)
@@ -67,7 +129,7 @@ namespace Game.Core.Saves
             return lookup;
         }
 
-        public static GridStateSaveDto CaptureGrid(GridState grid)
+        public static GridStateSaveDto CaptureGrid(GridState grid, IEnumerable<CardInstance> knownCards)
         {
             if (grid == null)
             {
@@ -75,7 +137,6 @@ namespace Game.Core.Saves
             }
 
             GridStateSaveDto dto = new GridStateSaveDto();
-            Dictionary<CardInstance, uint> idMap = new Dictionary<CardInstance, uint>();
 
             foreach (GridCell cell in grid.Cells)
             {
@@ -94,9 +155,12 @@ namespace Game.Core.Saves
                 dto.Cells.Add(cellDto);
             }
 
-            foreach (CardInstance card in grid.AllKnownCards)
+            if (knownCards != null)
             {
-                dto.Cards.Add(CaptureCardInstance(card));
+                foreach (CardInstance card in knownCards)
+                {
+                    dto.Cards.Add(CaptureCardInstance(card));
+                }
             }
 
             return dto;
@@ -137,6 +201,22 @@ namespace Game.Core.Saves
             foreach (KeyValuePair<string, int> entry in card.RuntimeState)
             {
                 dto.RuntimeState.Add(new RuntimeStateEntry { Key = entry.Key, Value = entry.Value });
+            }
+
+            return dto;
+        }
+
+        public static DungeonDeckSaveDto CaptureDungeonDeck(DungeonDeck deck)
+        {
+            if (deck == null)
+            {
+                return null;
+            }
+
+            DungeonDeckSaveDto dto = new DungeonDeckSaveDto();
+            for (int i = 0; i < deck.Cards.Count; i++)
+            {
+                dto.CardInstanceIds.Add(deck.Cards[i].InstanceId.Value);
             }
 
             return dto;
@@ -185,6 +265,45 @@ namespace Game.Core.Saves
             return dto;
         }
 
+        public static List<ChoiceSessionSaveDto> CaptureChoiceSessions(ChoiceSessionStore store)
+        {
+            List<ChoiceSessionSaveDto> result = new List<ChoiceSessionSaveDto>();
+            if (store == null)
+            {
+                return result;
+            }
+
+            foreach (ChoiceSession session in store.Sessions)
+            {
+                result.Add(new ChoiceSessionSaveDto
+                {
+                    SessionId = session.SessionId,
+                    OptionCount = session.OptionCount,
+                    ChoiceKind = session.ChoiceKind,
+                    IsResolved = session.IsResolved,
+                    SelectedOptionIndex = session.SelectedOptionIndex
+                });
+            }
+
+            return result;
+        }
+
+        public static List<int> CaptureRouteChoices(IReadOnlyList<RoomType> routeChoices)
+        {
+            List<int> result = new List<int>();
+            if (routeChoices == null)
+            {
+                return result;
+            }
+
+            for (int i = 0; i < routeChoices.Count; i++)
+            {
+                result.Add((int)routeChoices[i]);
+            }
+
+            return result;
+        }
+
         public static GridState RestoreGrid(GridStateSaveDto dto)
         {
             if (dto == null)
@@ -195,7 +314,6 @@ namespace Game.Core.Saves
             GridState grid = new GridState();
             Dictionary<uint, CardInstance> cardsById = new Dictionary<uint, CardInstance>();
 
-            // First pass: reconstruct all CardInstances
             foreach (CardInstanceSaveDto cardDto in dto.Cards)
             {
                 CardInstance card = new CardInstance(
@@ -223,10 +341,10 @@ namespace Game.Core.Saves
                     card.SetState(entry.Key, entry.Value);
                 }
 
+                grid.TrackCard(card);
                 cardsById[cardDto.InstanceId] = card;
             }
 
-            // Second pass: place cards into cells by stack order
             foreach (GridCellSaveDto cellDto in dto.Cells)
             {
                 GridCoord coord = new GridCoord(cellDto.CoordRow, cellDto.CoordCol);
@@ -241,6 +359,25 @@ namespace Game.Core.Saves
             }
 
             return grid;
+        }
+
+        public static DungeonDeck RestoreDungeonDeck(DungeonDeckSaveDto dto, Dictionary<uint, CardInstance> cardLookup)
+        {
+            if (dto == null)
+            {
+                return null;
+            }
+
+            DungeonDeck deck = new DungeonDeck();
+            for (int i = 0; i < dto.CardInstanceIds.Count; i++)
+            {
+                if (cardLookup.TryGetValue(dto.CardInstanceIds[i], out CardInstance card))
+                {
+                    deck.AddToTop(card);
+                }
+            }
+
+            return deck;
         }
 
         public static void RestoreItemInventory(PlayerInventorySaveDto dto, PlayerInventory inventory, Dictionary<uint, CardInstance> cardLookup)
@@ -278,6 +415,67 @@ namespace Game.Core.Saves
                 relics.ActiveSlot.Assign(new ModelId(dto.ActiveRelic.Category, dto.ActiveRelic.Entry), dto.ActiveRelicMaxUses);
                 relics.ActiveSlot.SetUsesRemaining(dto.ActiveRelicUsesRemaining);
             }
+        }
+
+        public static void RestoreChoiceSessions(List<ChoiceSessionSaveDto> dtos, ChoiceSessionStore store)
+        {
+            if (store == null)
+            {
+                return;
+            }
+
+            store.Clear();
+            if (dtos == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < dtos.Count; i++)
+            {
+                ChoiceSessionSaveDto dto = dtos[i];
+                store.Restore(dto.SessionId, dto.OptionCount, dto.ChoiceKind, dto.IsResolved, dto.SelectedOptionIndex);
+            }
+        }
+
+        public static void RestoreRng(uint? rngState, DomainActionContext domain)
+        {
+            if (!rngState.HasValue || domain == null)
+            {
+                return;
+            }
+
+            if (domain.Rng is DeterministicRng deterministicRng)
+            {
+                deterministicRng.RestoreState(new RngState(rngState.Value));
+                return;
+            }
+
+            domain.Rng = new DeterministicRng(new RngState(rngState.Value));
+        }
+
+        public static void RestoreProgression(RoomDomainStateSaveDto dto, DomainActionContext domain)
+        {
+            if (dto == null || domain == null)
+            {
+                return;
+            }
+
+            if (dto.LayerIndex <= 0 || dto.NodeIndex <= 0)
+            {
+                domain.Progression = null;
+                return;
+            }
+
+            List<RoomType> routeChoices = new List<RoomType>();
+            if (dto.RouteChoiceRoomTypes != null)
+            {
+                for (int i = 0; i < dto.RouteChoiceRoomTypes.Count; i++)
+                {
+                    routeChoices.Add((RoomType)dto.RouteChoiceRoomTypes[i]);
+                }
+            }
+
+            domain.Progression = new RunProgressionState(dto.LayerIndex, dto.NodeIndex, (RoomType)dto.RoomType, routeChoices);
         }
     }
 }

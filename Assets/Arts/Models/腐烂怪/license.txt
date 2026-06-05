@@ -1,0 +1,11 @@
+Model Information:
+* title:	SWAMP MONSTER
+* source:	https://sketchfab.com/3d-models/swamp-monster-6dab8cb402864d9c842d52e4dded1bdf
+* author:	alexalbinyana (https://sketchfab.com/alexalbinyana)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "SWAMP MONSTER" (https://sketchfab.com/3d-models/swamp-monster-6dab8cb402864d9c842d52e4dded1bdf) by alexalbinyana (https://sketchfab.com/alexalbinyana) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

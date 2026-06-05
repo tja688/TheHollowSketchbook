@@ -10,10 +10,16 @@ namespace Game.Core.Domain.Deck
     public sealed class DungeonDeck
     {
         private readonly List<CardInstance> _cards = new List<CardInstance>();
+        private readonly IReadOnlyList<CardInstance> _cardView;
+
+        public DungeonDeck()
+        {
+            _cardView = _cards.AsReadOnly();
+        }
 
         public IReadOnlyList<CardInstance> Cards
         {
-            get { return _cards; }
+            get { return _cardView; }
         }
 
         public int Count

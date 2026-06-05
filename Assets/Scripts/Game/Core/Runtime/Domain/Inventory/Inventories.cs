@@ -54,10 +54,16 @@ namespace Game.Core.Domain.Inventory
     public sealed class PlayerInventory
     {
         private readonly List<CardInstance> _items = new List<CardInstance>();
+        private readonly IReadOnlyList<CardInstance> _itemView;
+
+        public PlayerInventory()
+        {
+            _itemView = _items.AsReadOnly();
+        }
 
         public IReadOnlyList<CardInstance> Items
         {
-            get { return _items; }
+            get { return _itemView; }
         }
 
         public int Count

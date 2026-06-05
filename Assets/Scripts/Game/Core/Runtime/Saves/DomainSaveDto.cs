@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Game.Core.Domain.Cards;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Inventory;
+using Game.Core.Domain.Interaction;
+using Game.Core.Domain.Rooms;
 
 namespace Game.Core.Saves
 {
@@ -67,12 +69,45 @@ namespace Game.Core.Saves
     }
 
     [Serializable]
+    public sealed class DungeonDeckSaveDto
+    {
+        public List<uint> CardInstanceIds = new List<uint>();
+    }
+
+    [Serializable]
+    public sealed class ChoiceSessionSaveDto
+    {
+        public string SessionId;
+        public int OptionCount;
+        public string ChoiceKind;
+        public bool IsResolved;
+        public int SelectedOptionIndex = -1;
+    }
+
+    [Serializable]
+    public sealed class RunProgressionSaveDto
+    {
+        public int LayerIndex;
+        public int NodeIndex;
+        public int CurrentRoomType;
+        public List<int> PendingChoiceRoomTypes = new List<int>();
+    }
+
+    [Serializable]
     public sealed class RoomDomainStateSaveDto
     {
+        public int RoomType;
+        public int LayerIndex;
+        public int NodeIndex;
         public int ActionCounterValue;
         public int PlayerGold;
+        public uint? RngState;
         public GridStateSaveDto Grid;
+        public DungeonDeckSaveDto DungeonDeck;
         public PlayerInventorySaveDto ItemInventory;
         public RelicInventorySaveDto RelicInventory;
+        public List<ChoiceSessionSaveDto> ActiveChoices = new List<ChoiceSessionSaveDto>();
+        public List<uint> PendingTriggerCardInstanceIds = new List<uint>();
+        public List<int> RouteChoiceRoomTypes = new List<int>();
     }
 }

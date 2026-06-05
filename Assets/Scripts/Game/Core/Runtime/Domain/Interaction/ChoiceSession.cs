@@ -45,6 +45,12 @@ namespace Game.Core.Domain.Interaction
             SelectedOptionIndex = optionIndex;
             return true;
         }
+
+        internal void RestoreResolution(bool isResolved, int selectedOptionIndex)
+        {
+            IsResolved = isResolved;
+            SelectedOptionIndex = isResolved ? selectedOptionIndex : -1;
+        }
     }
 
     public sealed class ChoiceSessionStore
@@ -59,6 +65,14 @@ namespace Game.Core.Domain.Interaction
         public ChoiceSession Open(string sessionId, int optionCount, string choiceKind = null)
         {
             ChoiceSession session = new ChoiceSession(sessionId, optionCount, choiceKind);
+            _sessions[session.SessionId] = session;
+            return session;
+        }
+
+        public ChoiceSession Restore(string sessionId, int optionCount, string choiceKind, bool isResolved, int selectedOptionIndex)
+        {
+            ChoiceSession session = new ChoiceSession(sessionId, optionCount, choiceKind);
+            session.RestoreResolution(isResolved, selectedOptionIndex);
             _sessions[session.SessionId] = session;
             return session;
         }
