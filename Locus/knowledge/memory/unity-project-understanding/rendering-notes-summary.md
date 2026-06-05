@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779672335148
-updatedAt: 1780499375355
+updatedAt: 1780649753719
 ---
 
 # rendering-notes-summary
 
 ## Summary
-Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, card-face printing prototypes, the TestPlane TMP surface prototype, and current RetroFakeLit card/text rendering constraints.
+Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, shadow behavior of RetroFakeLit, card-face printing prototypes, the TestPlane TMP surface prototype, and current RetroFakeLit card/text rendering constraints.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -39,6 +39,12 @@ Concise lookup cache for current render validation scene, comfort tuning, render
 - Main entry: `Tools/CardDungeon Rendering/项目渲染管线综合控制台`.
 - It manages URP baseline, Phase 05 RetroFakeLit, Phase 07 Posterize LUT, Phase 08 Retro Composite, Bloom, and presets.
 - Key editable assets remain the URP HighFidelity settings, renderer feature asset, SampleSceneProfile, Phase 07/08 materials, and preset assets.
+
+## Shadow / RetroFakeLit Findings
+
+- `Assets/Settings/URP-HighFidelity.asset` currently keeps main-light shadows on, but disables additional/local light shadows (`m_AdditionalLightShadowsSupported = 0`, `m_LocalShadowsSupported = 0`). So spot/point lights in `Assets/Tests/render.unity` can light objects but will not cast realtime shadows.
+- `Assets/_Project/Rendering/Shaders/RetroFakeLit.shader` samples main-light shadow attenuation, so RetroFakeLit materials can receive main directional-light shadows, but the shader currently has no `ShadowCaster` pass. Objects using this shader therefore do not cast shadows into URP shadow maps.
+- Practical consequence in `Assets/Tests/render.unity`: with most visible props using RetroFakeLit, the scene can look like “lighting works but nothing really throws shadows,” especially under local lights.
 
 ## Card Face Printing Prototype
 

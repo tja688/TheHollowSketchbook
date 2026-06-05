@@ -345,6 +345,9 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         {
             CreateStatCard("Render Scale", GetUrpFloat("m_RenderScale").ToString("0.###"), "越低越像旧画布，越高越清晰。"),
             CreateStatCard("Upscaling", GetUpscalingLabel(GetUrpInt("m_UpscalingFilter")), "决定低清画布被放大时更偏像素还是更平滑。"),
+            CreateStatCard("主光阴影", GetUrpBool("m_MainLightShadowsSupported") ? "开" : "关", "方向光阴影总开关。关掉后大部分真实投影都会直接消失。"),
+            CreateStatCard("附加灯阴影", GetUrpBool("m_AdditionalLightShadowsSupported") ? "开" : "关", "点光/聚光的实时阴影总开关。"),
+            CreateStatCard("Shadow Distance", GetUrpFloat("m_ShadowDistance").ToString("0.0"), "阴影绘制距离。太小会像没投影，太大又容易暴露现代感。"),
             CreateStatCard("Phase07 LUT", GetMaterialTextureName(config.retroPosterizeThresholdMaterial, "_UserLut"), "暗部会优先被这张 LUT 染色。"),
             CreateStatCard("Phase07 Contribution", GetMaterialFloat(config.retroPosterizeThresholdMaterial, "_Contribution").ToString("0.00"), "越大，暗部统一风格越强。"),
             CreateStatCard("Composite Palette", GetMaterialFloat(config.retroCompositeMaterial, "_PaletteStrength").ToString("0.00"), "越大，暗部越会被压向固定调色板。"),
@@ -447,8 +450,19 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 SetUrpBool("m_SupportsHDR", true, "Apply HDR Preset");
                 SetUrpBool("m_RequireDepthTexture", true, "Apply Depth Preset");
                 SetUrpBool("m_RequireOpaqueTexture", false, "Apply Opaque Preset");
+                SetUrpBool("m_MainLightShadowsSupported", true, "Enable Main Light Shadows");
+                SetUrpBool("m_AdditionalLightShadowsSupported", true, "Enable Additional Light Shadows");
+                SetUrpBool("m_LocalShadowsSupported", true, "Enable Local Shadows");
+                SetUrpBool("m_SoftShadowsSupported", true, "Enable Soft Shadows");
+                SetUrpInt("m_MainLightShadowmapResolution", 512, "Apply Main Light Shadow Resolution Preset");
+                SetUrpInt("m_AdditionalLightsShadowmapResolution", 4096, "Apply Additional Shadow Atlas Preset");
+                SetUrpInt("m_AdditionalLightsShadowResolutionTierLow", 128, "Apply Additional Low Shadow Tier Preset");
+                SetUrpInt("m_AdditionalLightsShadowResolutionTierMedium", 256, "Apply Additional Medium Shadow Tier Preset");
+                SetUrpInt("m_AdditionalLightsShadowResolutionTierHigh", 512, "Apply Additional High Shadow Tier Preset");
                 SetUrpInt("m_AdditionalLightsPerObjectLimit", 4, "Apply Light Limit Preset");
                 SetUrpFloat("m_ShadowDistance", 18f, "Apply Shadow Distance Preset");
+                SetUrpFloat("m_ShadowDepthBias", 1f, "Apply Shadow Depth Bias Preset");
+                SetUrpFloat("m_ShadowNormalBias", 1f, "Apply Shadow Normal Bias Preset");
                 SetCompositeVirtualResolution(960, 540, 1f);
                 RefreshPage();
             })),
@@ -523,6 +537,27 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 0, 8,
                 () => GetUrpInt("m_AdditionalLightsPerObjectLimit"),
                 value => SetUrpInt("m_AdditionalLightsPerObjectLimit", value, "Change Additional Lights Limit")));
+        }));
+
+        contentScroll.Add(CreateSectionCard("阴影总开关与范围", "这组先决定“有没有阴影”，再决定阴影能覆盖到多远。排查“灯亮了但没投影”时先看这里。", section =>
+        {
+            section.Add(CreateToggleControl(
+                "Main Light Shadows",
+                "方向光阴影总开关。关掉后主方向光仍会照亮物体，但不会产出真实投影。",
+                () => GetUrpBool("m_MainLightShadowsSupported"),
+                value => SetUrpBool("m_MainLightShadowsSupported", value, "Toggle Main Light Shadows")));
+
+            section.Add(CreateToggleControl(
+                "Additional Light Shadows",
+                "点光/聚光阴影总开关。关掉后局部灯还能打亮，但桌面和物体之间不会出现局部投影。",
+                () => GetUrpBool("m_AdditionalLightShadowsSupported"),
+                value => SetUrpBool("m_AdditionalLightShadowsSupported", value, "Toggle Additional Light Shadows")));
+
+            section.Add(CreateToggleControl(
+                "Local Shadows",
+                "当前 URP 资产里的本地阴影链路开关。通常和附加灯阴影一起检查，避免你只开一半。",
+                () => GetUrpBool("m_LocalShadowsSupported"),
+                value => SetUrpBool("m_LocalShadowsSupported", value, "Toggle Local Shadows")));
 
             section.Add(CreateFloatControl(
                 "Shadow Distance",
@@ -532,10 +567,82 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 value => SetUrpFloat("m_ShadowDistance", value, "Change Shadow Distance")));
         }));
 
+        contentScroll.Add(CreateSectionCard("阴影质量与偏移", "这组决定阴影边缘是否太硬、阴影贴图是否糊，以及会不会出现悬浮感或痤疮。", section =>
+        {
+            section.Add(CreateToggleControl(
+                "Soft Shadows",
+                "开：阴影边缘更柔，烛光氛围更自然；关：边缘更硬、更脏，但也更像低技术旧画面。",
+                () => GetUrpBool("m_SoftShadowsSupported"),
+                value => SetUrpBool("m_SoftShadowsSupported", value, "Toggle Soft Shadows")));
+
+            section.Add(CreatePopupIntControl(
+                "Main Light Shadow Resolution",
+                "方向光阴影贴图分辨率。调大：主投影更清楚；调小：更糊、更省，但细节容易断。",
+                () => GetUrpInt("m_MainLightShadowmapResolution"),
+                value => SetUrpInt("m_MainLightShadowmapResolution", value, "Change Main Light Shadow Resolution"),
+                new[]
+                {
+                    new IntOption(256, "256"),
+                    new IntOption(512, "512"),
+                    new IntOption(1024, "1024"),
+                    new IntOption(2048, "2048"),
+                    new IntOption(4096, "4096")
+                }));
+
+            section.Add(CreatePopupIntControl(
+                "Additional Shadow Atlas",
+                "附加灯阴影图集分辨率。调大：局部灯阴影更稳；调小：多个局部灯同时存在时更容易糊。",
+                () => GetUrpInt("m_AdditionalLightsShadowmapResolution"),
+                value => SetUrpInt("m_AdditionalLightsShadowmapResolution", value, "Change Additional Shadow Atlas Resolution"),
+                new[]
+                {
+                    new IntOption(512, "512"),
+                    new IntOption(1024, "1024"),
+                    new IntOption(2048, "2048"),
+                    new IntOption(4096, "4096"),
+                    new IntOption(8192, "8192")
+                }));
+
+            section.Add(CreateIntControl(
+                "Additional Shadow Tier Low",
+                "附加灯使用 Low 阴影档时的单灯分辨率。调大：低档局部灯也更清楚；调小：更省，但最容易糊。",
+                64, 2048,
+                () => GetUrpInt("m_AdditionalLightsShadowResolutionTierLow"),
+                value => SetUrpInt("m_AdditionalLightsShadowResolutionTierLow", value, "Change Additional Shadow Tier Low")));
+
+            section.Add(CreateIntControl(
+                "Additional Shadow Tier Medium",
+                "附加灯使用 Medium 阴影档时的单灯分辨率。当前场景里像桌面暖光这种局部灯，通常最值得先看这一档。",
+                64, 2048,
+                () => GetUrpInt("m_AdditionalLightsShadowResolutionTierMedium"),
+                value => SetUrpInt("m_AdditionalLightsShadowResolutionTierMedium", value, "Change Additional Shadow Tier Medium")));
+
+            section.Add(CreateIntControl(
+                "Additional Shadow Tier High",
+                "附加灯使用 High 阴影档时的单灯分辨率。只给关键气氛灯或特写灯保留更高精度。",
+                64, 4096,
+                () => GetUrpInt("m_AdditionalLightsShadowResolutionTierHigh"),
+                value => SetUrpInt("m_AdditionalLightsShadowResolutionTierHigh", value, "Change Additional Shadow Tier High")));
+
+            section.Add(CreateFloatControl(
+                "Shadow Depth Bias",
+                "深度偏移。调大：更不容易长阴影痤疮；调过头：阴影会像飘起来。",
+                0f, 5f,
+                () => GetUrpFloat("m_ShadowDepthBias"),
+                value => SetUrpFloat("m_ShadowDepthBias", value, "Change Shadow Depth Bias")));
+
+            section.Add(CreateFloatControl(
+                "Shadow Normal Bias",
+                "法线偏移。调大：表面噪点更少；调过头：接触阴影会后退，像物体离桌面有缝。",
+                0f, 5f,
+                () => GetUrpFloat("m_ShadowNormalBias"),
+                value => SetUrpFloat("m_ShadowNormalBias", value, "Change Shadow Normal Bias")));
+        }));
+
         contentScroll.Add(CreateSectionCard("AI 自动化调试可用性", "这里总结当前 AI/编辑器能安全直接操作的固定分辨率相关接线，方便后续维护时快速判断。", section =>
         {
             section.Add(CreateChecklistLabel($"当前活动场景：`{EditorSceneManager.GetActiveScene().path}`，主相机 `Main Camera` 直接输出到屏幕，Target Texture = None。"));
-            section.Add(CreateChecklistLabel("AI 当前可直接改：`Assets/Settings/URP-HighFidelity.asset` 的 Render Scale / Upscaling、`Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat` 的 VirtualWidth/Height/Pixelate、Renderer Feature 开关、Bloom Volume。"));
+            section.Add(CreateChecklistLabel("AI 当前可直接改：`Assets/Settings/URP-HighFidelity.asset` 的 Render Scale / Upscaling / 阴影开关 / 阴影分辨率 / Shadow Distance / Bias、`Assets/VisualPrototypes/InscryptionRetro/Materials/M_RetroComposite_Inscryption.mat` 的 VirtualWidth/Height/Pixelate、Renderer Feature 开关、Bloom Volume。"));
             section.Add(CreateChecklistLabel("AI 当前不能直接验证：不同显示器真实黑边、运行时鼠标坐标映射、最终构建包分辨率一致性。这些仍需你手测 GameView/Player。"));
             section.Add(CreateChecklistLabel("因此 Phase 09 现阶段对 AI 最友好的做法，就是把固定档位与排查入口都收敛进控制台，而不是额外引入一套尚未接交互系统的运行时代码。"));
         }));

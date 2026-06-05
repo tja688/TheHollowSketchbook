@@ -30,7 +30,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _CompareDebug: 0
-    - _Contribution: 0.359
+    - _Contribution: 0.137
     - _DebugMask: 0
     - _LutStrength: 0.8
     - _Threshold: 0.412

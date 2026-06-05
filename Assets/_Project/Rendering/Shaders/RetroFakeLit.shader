@@ -48,6 +48,8 @@ Shader "CardDungeon/RetroFakeLit"
             #pragma fragment Frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -201,6 +203,80 @@ Shader "CardDungeon/RetroFakeLit"
                 float fog = saturate((distanceToCamera - _FogStart) / max(0.001, _FogEnd - _FogStart));
                 color = lerp(color, _FogColor.rgb, fog);
                 return half4(saturate(color), 1.0h);
+            }
+            ENDHLSL
+        }
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
+
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex ShadowPassVertex
+            #pragma fragment ShadowPassFragment
+            #pragma multi_compile_instancing
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+
+            float3 _LightDirection;
+            float3 _LightPosition;
+
+            struct ShadowAttributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct ShadowVaryings
+            {
+                float4 positionCS : SV_POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            float4 GetShadowPositionHClip(ShadowAttributes input)
+            {
+                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+
+                #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                float3 lightDirectionWS = normalize(_LightPosition - positionWS);
+                #else
+                float3 lightDirectionWS = _LightDirection;
+                #endif
+
+                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+
+                #if UNITY_REVERSED_Z
+                positionCS.z = min(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #else
+                positionCS.z = max(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #endif
+
+                return positionCS;
+            }
+
+            ShadowVaryings ShadowPassVertex(ShadowAttributes input)
+            {
+                ShadowVaryings output;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                output.positionCS = GetShadowPositionHClip(input);
+                return output;
+            }
+
+            half4 ShadowPassFragment(ShadowVaryings input) : SV_TARGET
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                return 0;
             }
             ENDHLSL
         }
