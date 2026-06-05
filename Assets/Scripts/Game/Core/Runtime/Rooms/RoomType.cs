@@ -7,6 +7,13 @@ namespace Game.Core.Rooms
         Treasure,
         RestSite,
         Shop,
-        Boss
+        Boss,
+        Gold,
+        Chest,
+        StatUpgrade,
+        Reward,
+        EliteCombat,
+        BossCombat,
+        Restaurant
     }
 }

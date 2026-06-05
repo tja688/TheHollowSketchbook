@@ -10,8 +10,12 @@ using Game.Core.Domain.Events;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
 using Game.Core.Domain.ContentContracts;
+using Game.Core.Domain.Deck;
+using Game.Core.Domain.Rooms;
 using Game.Core.Domain.Validation;
 using Game.Core.Models;
+using Game.Core.Random;
+using Game.Core.Rooms;
 using NUnit.Framework;
 
 namespace Game.Core.Tests
@@ -429,6 +433,76 @@ namespace Game.Core.Tests
                 Assert.AreEqual(8, result.HpLoss);
                 Assert.AreEqual(10 - 8, monster.CurrentHp);
             });
+        }
+
+        [Test]
+        public void DungeonMapGenerator_CreatesDesignNineNodeLayer()
+        {
+            DungeonMapGenerator generator = new DungeonMapGenerator();
+            IReadOnlyList<RoomPlan> plans = generator.GenerateLayerPlans(1);
+
+            Assert.AreEqual(9, plans.Count);
+            Assert.AreEqual(RoomType.Reward, plans[0].RoomType);
+            Assert.AreEqual(RoomType.Restaurant, plans[7].RoomType);
+            Assert.AreEqual(RoomType.BossCombat, plans[8].RoomType);
+            CollectionAssert.AreEquivalent(new[] { RoomType.Gold, RoomType.Chest, RoomType.StatUpgrade }, generator.GetChoicePoolAfterNode(1));
+            CollectionAssert.Contains(generator.GetChoicePoolAfterNode(4), RoomType.Shop);
+            CollectionAssert.Contains(generator.GetChoicePoolAfterNode(4), RoomType.EliteCombat);
+            Assert.AreEqual(RoomType.Restaurant, generator.GetForcedNextRoomAfterNode(7));
+        }
+
+        [Test]
+        public void DungeonDeckBuilder_BuildsCountsByRoomTypeAndLayer()
+        {
+            DungeonDeckBuilder builder = new DungeonDeckBuilder();
+            DungeonDeck rewardDeck = builder.Build(new RoomPlan(RoomType.Reward, 1, 1, false, false, new RngState(7)), null, new DeterministicRng(7));
+
+            Assert.AreEqual(10, rewardDeck.Cards.Count(card => card.CardType == CardType.Monster));
+            Assert.AreEqual(1, rewardDeck.Cards.Count(card => card.CardType == CardType.Chest));
+            Assert.AreEqual(1, rewardDeck.Cards.Count(card => card.CardType == CardType.StatUpgrade));
+            Assert.That(rewardDeck.Cards.Count(card => card.CardType == CardType.Trap), Is.InRange(2, 4));
+            Assert.That(rewardDeck.Cards.Count(card => card.CardType == CardType.Item), Is.InRange(4, 6));
+
+            DungeonDeck restaurantDeck = builder.Build(new RoomPlan(RoomType.Restaurant, 1, 8, false, false, new RngState(8)), null, new DeterministicRng(8));
+            Assert.AreEqual(1, restaurantDeck.Cards.Count(card => card.CardType == CardType.Food));
+            Assert.AreEqual(3, restaurantDeck.Cards.Count(card => card.CardType == CardType.Mentor));
+            Assert.AreEqual(0, restaurantDeck.Cards.Count(card => card.CardType == CardType.Trap));
+            Assert.AreEqual(0, restaurantDeck.Cards.Count(card => card.CardType == CardType.Item));
+        }
+
+        [Test]
+        public void MonsterAllocationRule_StrictlyMatchesLayerTargetAfterCorrection()
+        {
+            MonsterAllocationRule rule = new MonsterAllocationRule(6, new[]
+            {
+                new MonsterTierRange(1, 0, 1),
+                new MonsterTierRange(2, 2, 3),
+                new MonsterTierRange(3, 3, 4),
+                new MonsterTierRange(4, 1, 4)
+            });
+
+            IReadOnlyDictionary<int, int> counts = rule.AllocateCounts(3, new DeterministicRng(19));
+
+            Assert.AreEqual(12, counts.Values.Sum());
+            Assert.IsTrue(counts.Keys.All(level => level >= 1 && level <= 4));
+        }
+
+        [Test]
+        public void GridDealer_DealsCombatCoverageAndRestaurantException()
+        {
+            DungeonDeckBuilder builder = new DungeonDeckBuilder();
+            GridDealer dealer = new GridDealer();
+
+            GridState combatGrid = NewGridWithPlayer();
+            DungeonDeck combatDeck = builder.Build(new RoomPlan(RoomType.Combat, 1, 2, false, false, new RngState(11)), null, new DeterministicRng(11));
+            dealer.Deal(combatGrid, combatDeck, DealPolicy.CombatDefault(), new DeterministicRng(12));
+            Assert.IsTrue(GridQueries.AllCoordsRowMajor().Where(coord => coord.CellIndex != 8).All(coord => combatGrid.GetStack(coord).Count >= 1));
+            Assert.IsTrue(combatGrid.AllGridCards.Where(card => card.CardType != CardType.Player).All(card => !card.IsFaceUp));
+
+            GridState restaurantGrid = NewGridWithPlayer();
+            DungeonDeck restaurantDeck = builder.Build(new RoomPlan(RoomType.Restaurant, 1, 8, false, false, new RngState(13)), null, new DeterministicRng(13));
+            dealer.Deal(restaurantGrid, restaurantDeck, DealPolicy.RestaurantDefault(), new DeterministicRng(14));
+            Assert.AreEqual(4, restaurantGrid.AllGridCards.Count(card => card.CardType != CardType.Player));
         }
 
         private sealed class TestRelicModel : Game.Core.Domain.ContentContracts.RelicModel

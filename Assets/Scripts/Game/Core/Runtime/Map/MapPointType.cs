@@ -9,6 +9,11 @@ namespace Game.Core.Map
         Shop,
         Elite,
         Rest,
-        Boss
+        Boss,
+        Gold,
+        Chest,
+        StatUpgrade,
+        Reward,
+        Restaurant
     }
 }
