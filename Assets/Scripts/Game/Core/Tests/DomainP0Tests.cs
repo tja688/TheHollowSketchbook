@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -18,6 +19,7 @@ using Game.Core.Models;
 using Game.Core.Random;
 using Game.Core.Rooms;
 using NUnit.Framework;
+using UnityEngine.TestTools;
 
 namespace Game.Core.Tests
 {
@@ -373,6 +375,74 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void UseItemIntent_ConsumesLastUseThroughLifecycleEvents()
+        {
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                ModelId itemModelId = new ModelId("test", "single-use-item");
+                TestItemModel itemModel = new TestItemModel(itemModelId);
+                ModelDb.Register(itemModel);
+                CardInstance item = new CardInstance(new CardInstanceId(3), itemModelId, CardType.Item);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                InventorySlot slot = context.ItemInventory.Store(item);
+                DomainFacade facade = new DomainFacade(context);
+
+                DomainEventBatch batch = await facade.SubmitIntentAsync(new UseItemIntent(slot));
+
+                Assert.AreEqual(CardZone.Removed, item.Zone);
+                Assert.IsTrue(item.IsRemoved);
+                Assert.AreEqual(0, context.ItemInventory.Count);
+                Assert.AreEqual(item.InstanceId, itemModel.LastDestroyedCardId);
+                Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.CardZoneChanged && e.CardId == item.InstanceId && e.Reason == CardZone.Removed.ToString()));
+                Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.CardRemoved && e.CardId == item.InstanceId && e.Reason == RemoveReason.Consumed.ToString()));
+            });
+        }
+
+        [Test]
+        public void UseItemIntent_CountableItemCommitsPlayerActionAndNotifiesObservers()
+        {
+            Await(async () =>
+            {
+                ModelId observerModelId = new ModelId("test", "item-action-observer");
+                TestMonsterModel observerModel = new TestMonsterModel(observerModelId, 6, 0, 0);
+                ModelDb.Register(observerModel);
+                GridState grid = NewGridWithPlayer();
+                CardInstance observer = new CardInstance(new CardInstanceId(2), observerModelId, CardType.Monster);
+                observer.ConfigureCombatStats(6, 0, 0);
+                grid.AddCardToGrid(observer, GridCoord.FromCellIndex(5), true);
+                ModelId itemModelId = new ModelId("test", "countable-item");
+                TestItemModel itemModel = new TestItemModel(itemModelId, countsAsPlayerAction: true);
+                ModelDb.Register(itemModel);
+                CardInstance item = new CardInstance(new CardInstanceId(3), itemModelId, CardType.Item);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                InventorySlot slot = context.ItemInventory.Store(item);
+                DomainFacade facade = new DomainFacade(context);
+
+                DomainEventBatch batch = await facade.SubmitIntentAsync(new UseItemIntent(slot));
+
+                Assert.AreEqual(1, context.ActionCounter.Value);
+                Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
+                Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.CardRemoved && e.CardId == item.InstanceId));
+            });
+        }
+
+        [Test]
+        public void ActionExecutor_EnqueuesGridOperationFollowUpActionsIntoCurrentDrain()
+        {
+            Await(async () =>
+            {
+                ActionQueueSet queue = new ActionQueueSet();
+                TestFlagAction followUp = new TestFlagAction();
+                queue.Enqueue(new TestFollowUpSourceAction(followUp));
+
+                await new ActionExecutor(queue).ExecuteAllAsync();
+
+                Assert.IsTrue(followUp.WasExecuted);
+            });
+        }
+
+        [Test]
         public void ChooseOptionIntent_RequiresOpenSessionAndResolvesOnce()
         {
             Await(async () =>
@@ -585,41 +655,41 @@ namespace Game.Core.Tests
             });
         }
 
-        [Test]
-        public void SubmitIntentAsync_SerializesConcurrentCalls()
+        [UnityTest]
+        public IEnumerator SubmitIntentAsync_SerializesConcurrentCalls()
         {
-            Await(async () =>
-            {
-                TaskCompletionSource<bool> entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                TaskCompletionSource<bool> release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                ModelId observerModelId = new ModelId("test", "serial-observer");
-                ModelDb.Register(new TestBlockingMonsterModel(observerModelId, entered, release));
+            TaskCompletionSource<bool> entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource<bool> release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            ModelId observerModelId = new ModelId("test", "serial-observer");
+            ModelDb.Register(new TestBlockingMonsterModel(observerModelId, entered, release));
 
-                GridState grid = NewGridWithPlayer();
-                CardInstance observer = new CardInstance(new CardInstanceId(2), observerModelId, CardType.Monster);
-                observer.ConfigureCombatStats(6, 0, 0);
-                grid.AddCardToGrid(observer, GridCoord.FromCellIndex(5), true);
-                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-                DomainFacade facade = new DomainFacade(context);
+            GridState grid = NewGridWithPlayer();
+            CardInstance observer = new CardInstance(new CardInstanceId(2), observerModelId, CardType.Monster);
+            observer.ConfigureCombatStats(6, 0, 0);
+            grid.AddCardToGrid(observer, GridCoord.FromCellIndex(5), true);
+            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+            DomainFacade facade = new DomainFacade(context);
 
-                Task<DomainEventBatch> firstTask = facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(9)));
-                await entered.Task;
+            Task<DomainEventBatch> firstTask = facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(9)));
+            yield return WaitForTask(entered.Task);
 
-                Task<DomainEventBatch> secondTask = facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(6)));
-                await Task.Yield();
-                Assert.IsFalse(secondTask.IsCompleted);
+            Task<DomainEventBatch> secondTask = facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(6)));
+            yield return null;
+            Assert.IsFalse(secondTask.IsCompleted);
 
-                release.SetResult(true);
-                DomainEventBatch firstBatch = await firstTask;
-                DomainEventBatch secondBatch = await secondTask;
+            release.SetResult(true);
+            yield return WaitForTask(firstTask);
+            yield return WaitForTask(secondTask);
 
-                Assert.AreEqual(2, context.ActionCounter.Value);
-                Assert.AreEqual(GridCoord.FromCellIndex(6), grid.PlayerCard.Coord.Value);
-                Assert.AreSame(firstBatch, context.Batches[0]);
-                Assert.AreSame(secondBatch, context.Batches[1]);
-                Assert.IsTrue(firstBatch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
-                Assert.IsTrue(secondBatch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
-            });
+            DomainEventBatch firstBatch = firstTask.Result;
+            DomainEventBatch secondBatch = secondTask.Result;
+
+            Assert.AreEqual(2, context.ActionCounter.Value);
+            Assert.AreEqual(GridCoord.FromCellIndex(6), grid.PlayerCard.Coord.Value);
+            Assert.AreSame(firstBatch, context.Batches[0]);
+            Assert.AreSame(secondBatch, context.Batches[1]);
+            Assert.IsTrue(firstBatch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
+            Assert.IsTrue(secondBatch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
         }
 
         [Test]
@@ -966,21 +1036,77 @@ namespace Game.Core.Tests
         private sealed class TestItemModel : ItemCardModel
         {
             private readonly ItemTargetMode _targetMode;
+            private readonly bool _countsAsPlayerAction;
 
-            public TestItemModel(ModelId id, ItemTargetMode targetMode = ItemTargetMode.None)
+            public TestItemModel(ModelId id, ItemTargetMode targetMode = ItemTargetMode.None, bool countsAsPlayerAction = false)
             {
                 Id = id;
                 _targetMode = targetMode;
+                _countsAsPlayerAction = countsAsPlayerAction;
             }
 
             public override ModelId Id { get; }
             public override ItemTargetMode TargetMode => _targetMode;
+            public override bool CountsAsPlayerAction => _countsAsPlayerAction;
             public UseItemIntent LastUseIntent { get; private set; }
+            public CardInstanceId LastDestroyedCardId { get; private set; }
 
             public override Task UseAsync(ItemUseContext ctx)
             {
                 LastUseIntent = (UseItemIntent)ctx.SourceIntent;
                 return Task.CompletedTask;
+            }
+
+            public override Task OnDestroyedAsync(CardDestroyedContext ctx)
+            {
+                LastDestroyedCardId = ctx.Card.InstanceId;
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class TestFollowUpSourceAction : GameAction
+        {
+            private readonly GameAction _followUp;
+
+            public TestFollowUpSourceAction(GameAction followUp)
+            {
+                _followUp = followUp;
+            }
+
+            protected override Task ExecuteActionAsync(GameActionExecutionContext ctx)
+            {
+                GridOperationResult result = GridOperationResult.Success(System.Array.Empty<DomainEvent>(), new[] { _followUp });
+                ctx.EnqueueFollowUpActions(result.FollowUpActions);
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class TestFlagAction : GameAction
+        {
+            public bool WasExecuted { get; private set; }
+
+            protected override Task ExecuteActionAsync(GameActionExecutionContext ctx)
+            {
+                WasExecuted = true;
+                return Task.CompletedTask;
+            }
+        }
+
+        private static IEnumerator WaitForTask(Task task)
+        {
+            while (!task.IsCompleted)
+            {
+                yield return null;
+            }
+
+            if (task.IsCanceled)
+            {
+                Assert.Fail("Task was canceled.");
+            }
+
+            if (task.IsFaulted)
+            {
+                Assert.Fail(task.Exception?.GetBaseException().ToString());
             }
         }
 

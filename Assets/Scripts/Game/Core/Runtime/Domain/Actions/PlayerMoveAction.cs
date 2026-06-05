@@ -31,10 +31,12 @@ namespace Game.Core.Domain.Actions
             else
             {
                 events.AddRange(move.Events);
+                ctx.EnqueueFollowUpActions(move.FollowUpActions);
                 events.Add(_domain.ActionCounter.Increment(_intent));
                 await _domain.NotifyAfterPlayerActionCommittedAsync(_intent, events);
                 GridOperationResult reveal = _domain.Grid.RevealAround(_intent.To, FlipReason.PlayerAdjacentReveal);
                 events.AddRange(reveal.Events);
+                ctx.EnqueueFollowUpActions(reveal.FollowUpActions);
                 await _domain.ProcessLifecycleAsync(events);
                 _domain.AppendPlayerDefeatedIfNeeded(events);
                 if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))

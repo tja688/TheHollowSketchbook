@@ -42,6 +42,7 @@ namespace Game.Core.Domain.Actions
             }
 
             events.AddRange(transfer.Events);
+            ctx.EnqueueFollowUpActions(transfer.FollowUpActions);
             InventorySlot slot = _domain.ItemInventory.Store(itemCard);
             events.Add(new DomainEvent(DomainEventType.ItemStored)
             {
@@ -108,12 +109,32 @@ namespace Game.Core.Domain.Actions
             });
             await itemModel.UseAsync(useContext);
 
+            if (itemModel.CountsAsPlayerAction)
+            {
+                events.Add(_domain.ActionCounter.Increment(_intent));
+                await _domain.NotifyAfterPlayerActionCommittedAsync(_intent, events);
+            }
+
             int usesRemaining = itemCard.GetState("usesRemaining", itemModel.MaxUses) - 1;
             if (usesRemaining <= 0)
             {
                 _domain.ItemInventory.RemoveAt(_intent.Slot);
+                _domain.Grid.TrackCard(itemCard);
                 itemCard.Zone = CardZone.Removed;
+                itemCard.Coord = null;
+                itemCard.StackIndex = -1;
+                itemCard.IsFaceUp = false;
                 itemCard.IsRemoved = true;
+                events.Add(new DomainEvent(DomainEventType.CardZoneChanged)
+                {
+                    CardId = itemCard.InstanceId,
+                    Reason = CardZone.Removed.ToString()
+                });
+                events.Add(new DomainEvent(DomainEventType.CardRemoved)
+                {
+                    CardId = itemCard.InstanceId,
+                    Reason = RemoveReason.Consumed.ToString()
+                });
             }
             else
             {

@@ -70,6 +70,25 @@ namespace Game.Core.Actions
 
     public sealed class GameActionExecutionContext
     {
+        private readonly ActionQueueSet _queueSet;
+
+        internal GameActionExecutionContext(ActionQueueSet queueSet)
+        {
+            _queueSet = queueSet;
+        }
+
+        public void EnqueueFollowUpActions(IEnumerable<GameAction> actions)
+        {
+            if (actions == null)
+            {
+                return;
+            }
+
+            foreach (GameAction action in actions)
+            {
+                _queueSet.Enqueue(action);
+            }
+        }
     }
 
     public sealed class ActionQueueSet
@@ -129,13 +148,14 @@ namespace Game.Core.Actions
     public sealed class ActionExecutor
     {
         private readonly ActionQueueSet _queueSet;
-        private readonly GameActionExecutionContext _context = new GameActionExecutionContext();
+        private readonly GameActionExecutionContext _context;
         private readonly object _executionLock = new object();
         private Task _runningTask;
 
         public ActionExecutor(ActionQueueSet queueSet)
         {
-            _queueSet = queueSet;
+            _queueSet = queueSet ?? throw new ArgumentNullException(nameof(queueSet));
+            _context = new GameActionExecutionContext(_queueSet);
         }
 
         public bool IsRunning

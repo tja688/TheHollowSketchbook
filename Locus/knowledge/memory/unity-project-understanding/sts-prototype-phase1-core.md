@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1780290415998
-updatedAt: 1780652486655
+updatedAt: 1780661200505
 ---
 
 # sts-prototype-phase1-core
 
 ## Summary
-当前 Unity 项目 Core/Presentation 结构与 P0 领域层入口、命名空间、关键规则、测试位置，以及最新 SubmitIntent 串行化与存档恢复边界速查。
+当前 Unity 项目 Core/Presentation 结构与 P0 领域层入口、命名空间、关键规则、测试位置，以及最新 SubmitIntent 串行化、MCP 测试死锁约束与存档恢复边界速查。
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -44,6 +44,8 @@ updatedAt: 1780652486655
 - `DomainFacade.SubmitIntentAsync()` 现已串行化：外部并发提交会排队等待同一 `SemaphoreSlim` 通道，Hook/生命周期中的同提交链重入会返回 `IntentRejected("SubmitIntentReentrant")`，`ActionExecutor.ExecuteAllAsync()` 会复用同一个运行中的 drain task，避免多个 executor 并发消费同一 `ActionQueueSet`。
 - `Assets/Scripts/Game/Core/Runtime/Saves/DomainSaveAdapter.cs` 当前已覆盖 Grid、DungeonDeck、Inventory、Relic、ChoiceSession、房间层/节点/类型、路线待选项与 RNG 恢复；`DomainActionContext.ReplaceGrid()` 会同步更新 `CombatResolution` 内部 Grid 引用，避免读档后 Combat 指向旧 Grid。
 - 当前领域存档仍未形成“完整设计闭环”：`PendingTrigger` 只是 DTO 占位未接入真实运行态，玩家多层属性/词条也还未进入 Domain 存档范围，不能对外宣称已完全落地。
-- P0 测试程序集是 `Assets/Scripts/Game/Core/Tests/Game.Core.Tests.asmdef`，测试文件是 `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs`，当前 `[Test]` 数量 28，已覆盖坐标、堆叠、移动/揭示、互动、非法意图、移除级联、伤害、清场、不变量、SubmitIntent 串行化、存档基础 round-trip、Combat Grid 引用切换、Deck/Inventory/Choice/Progression/RNG 恢复。
+- P0 测试程序集是 `Assets/Scripts/Game/Core/Tests/Game.Core.Tests.asmdef`，测试文件是 `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs`，当前主要覆盖坐标、堆叠、移动/揭示、互动、非法意图、移除级联、伤害、清场、不变量、SubmitIntent 串行化、存档基础 round-trip、Combat Grid 引用切换、Deck/Inventory/Choice/Progression/RNG 恢复。
+- 项目当前启用了 `com.unity.test-framework` `1.1.33`，并通过外部包 `com.coplaydev.unity-mcp` 提供 MCP 测试入口；该包含 `TestRunnerNoThrottle`，自动跑测试时会占用 `EditorApplication.update`。
+- `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs` 中需要编辑器帧推进的并发测试应优先写成 `[UnityTest] IEnumerator`，不要在普通 `[Test]` 中用 `GetAwaiter().GetResult()` 同步等待依赖 editor update 的 `Task`。
 - 项目开发规范文档：`Assets/Notes/项目开发规范.md`；L1 AI 执行手册：`Assets/Notes/L1开发AI快速执行手册.md`。
 <!-- locus:body:end -->

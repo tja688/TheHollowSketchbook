@@ -45,8 +45,8 @@ namespace Game.Core.Domain.Actions
             await model.OnPlayerInteractAsync(interactionContext);
             events.Add(_domain.ActionCounter.Increment(_intent));
             await _domain.NotifyAfterPlayerActionCommittedAsync(_intent, events);
-            RemoveIfDead(target, events);
-            RemoveIfDead(player, events);
+            RemoveIfDead(target, events, ctx);
+            RemoveIfDead(player, events, ctx);
             await _domain.ProcessLifecycleAsync(events);
             _domain.AppendPlayerDefeatedIfNeeded(events);
             if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))
@@ -57,7 +57,7 @@ namespace Game.Core.Domain.Actions
             AddBatch(events);
         }
 
-        private void RemoveIfDead(CardInstance card, List<DomainEvent> events)
+        private void RemoveIfDead(CardInstance card, List<DomainEvent> events, GameActionExecutionContext ctx)
         {
             if (card == null || !card.HasHitPoints || card.IsAlive || card.Zone != CardZone.Grid)
             {
@@ -65,7 +65,9 @@ namespace Game.Core.Domain.Actions
             }
 
             RemoveReason reason = card.CardType == CardType.Trap ? RemoveReason.Destroyed : RemoveReason.Defeated;
-            events.AddRange(_domain.Grid.RemoveCard(card, reason).Events);
+            GridOperationResult remove = _domain.Grid.RemoveCard(card, reason);
+            events.AddRange(remove.Events);
+            ctx.EnqueueFollowUpActions(remove.FollowUpActions);
             if (card.CardType == CardType.Monster)
             {
                 events.Add(new DomainEvent(DomainEventType.MonsterDefeated)

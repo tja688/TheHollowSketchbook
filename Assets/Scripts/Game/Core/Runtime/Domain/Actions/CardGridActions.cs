@@ -24,6 +24,7 @@ namespace Game.Core.Domain.Actions
         {
             CardInstance card = _domain.Grid.GetCard(_cardId);
             GridOperationResult result = _domain.Grid.FlipCard(card, _reason);
+            ctx.EnqueueFollowUpActions(result.FollowUpActions);
             DomainEventBatch batch = new DomainEventBatch(Id, null);
             batch.AddRange(result.Events);
             _domain.Batches.Add(batch);
@@ -48,6 +49,7 @@ namespace Game.Core.Domain.Actions
         {
             CardInstance card = _domain.Grid.GetCard(_cardId);
             GridOperationResult result = _domain.Grid.RemoveCard(card, _reason);
+            ctx.EnqueueFollowUpActions(result.FollowUpActions);
             DomainEventBatch batch = new DomainEventBatch(Id, null);
             batch.AddRange(result.Events);
             _domain.Batches.Add(batch);
