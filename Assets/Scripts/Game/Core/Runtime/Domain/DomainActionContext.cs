@@ -144,7 +144,9 @@ namespace Game.Core.Domain
                     continue;
                 }
 
-                await model.OnAfterPlayerActionCommittedAsync(new PlayerActionContext(this, card, sourceIntent, actionIndex, events));
+                PlayerActionContext context = new PlayerActionContext(this, card, sourceIntent, actionIndex, events);
+                await model.OnAfterPlayerActionCommittedAsync(context);
+                await NotifyCardTraitHooksAsync(card, trait => trait.OnPlayerActionCommittedAsync(context));
             }
         }
 
@@ -162,14 +164,18 @@ namespace Game.Core.Domain
                 {
                     if (Grid.TryGetCard(domainEvent.CardId, out CardInstance revealedCard) && TryResolveCardModel(revealedCard, out CardModel revealedModel))
                     {
-                        await revealedModel.OnRevealedAsync(new CardRevealContext(this, revealedCard, domainEvent.Reason, events));
+                        CardRevealContext context = new CardRevealContext(this, revealedCard, domainEvent.Reason, events);
+                        await revealedModel.OnRevealedAsync(context);
+                        await NotifyCardTraitHooksAsync(revealedCard, trait => trait.OnCardFlippedAsync(context));
                     }
                 }
                 else if (domainEvent.EventType == DomainEventType.CardRemoved)
                 {
                     if (Grid.TryGetCard(domainEvent.CardId, out CardInstance removedCard) && TryResolveCardModel(removedCard, out CardModel removedModel))
                     {
-                        await removedModel.OnDestroyedAsync(new CardDestroyedContext(this, removedCard, domainEvent.Reason, events));
+                        CardDestroyedContext context = new CardDestroyedContext(this, removedCard, domainEvent.Reason, events);
+                        await removedModel.OnDestroyedAsync(context);
+                        await NotifyCardTraitHooksAsync(removedCard, trait => trait.OnCardRemovedAsync(context));
                     }
                 }
             }

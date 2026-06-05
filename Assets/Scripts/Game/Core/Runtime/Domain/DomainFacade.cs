@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Game.Core.Actions;
 using Game.Core.Domain.Actions;
@@ -13,6 +14,8 @@ namespace Game.Core.Domain
         private readonly ActionQueueSet _queue = new ActionQueueSet();
         private readonly ActionExecutor _executor;
         private readonly IntentValidator _validator;
+        private readonly SemaphoreSlim _submitGate = new SemaphoreSlim(1, 1);
+        private readonly AsyncLocal<int> _submitDepth = new AsyncLocal<int>();
 
         public DomainFacade(DomainActionContext context)
         {
@@ -33,66 +36,80 @@ namespace Game.Core.Domain
 
         public async Task<DomainEventBatch> SubmitIntentAsync(PlayerIntent intent)
         {
-            int beforeCount = _context.Batches.Count;
-            IntentValidationResult validation = _validator.Validate(intent);
-            if (!validation.IsValid)
+            if (_submitDepth.Value > 0)
             {
-                DomainEventBatch rejected = new DomainEventBatch(0, intent);
-                rejected.Add(new DomainEvent(DomainEventType.IntentRejected) { Reason = validation.FailureCode });
-                _context.Batches.Add(rejected);
-                return rejected;
+                return RejectIntent(intent, "SubmitIntentReentrant");
             }
 
-            if (intent is MovePlayerIntent moveIntent)
+            await _submitGate.WaitAsync().ConfigureAwait(false);
+            _submitDepth.Value++;
+            try
             {
-                _queue.Enqueue(new PlayerMoveAction(_context, moveIntent));
-            }
-            else if (intent is InteractWithCardIntent interactIntent)
-            {
-                _queue.Enqueue(new PlayerInteractAction(_context, interactIntent));
-            }
-            else if (intent is StoreItemIntent storeItemIntent)
-            {
-                _queue.Enqueue(new StoreItemAction(_context, storeItemIntent));
-            }
-            else if (intent is UseItemIntent useItemIntent)
-            {
-                _queue.Enqueue(new UseItemAction(_context, useItemIntent));
-            }
-            else if (intent is ChooseOptionIntent chooseOptionIntent)
-            {
-                if (!_context.ChoiceSessions.TryResolve(chooseOptionIntent.SessionId, chooseOptionIntent.OptionIndex, out ChoiceSession session))
+                int beforeCount = _context.Batches.Count;
+                IntentValidationResult validation = _validator.Validate(intent);
+                if (!validation.IsValid)
                 {
-                    DomainEventBatch rejected = new DomainEventBatch(0, chooseOptionIntent);
-                    rejected.Add(new DomainEvent(DomainEventType.IntentRejected) { Reason = "ChoiceResolveFailed" });
-                    _context.Batches.Add(rejected);
-                    return rejected;
+                    return RejectIntent(intent, validation.FailureCode);
                 }
 
-                DomainEventBatch batch = new DomainEventBatch(0, chooseOptionIntent);
-                batch.Add(new DomainEvent(DomainEventType.ChoiceResolved)
+                if (intent is MovePlayerIntent moveIntent)
                 {
-                    Amount = chooseOptionIntent.OptionIndex,
-                    SecondaryAmount = session.OptionCount,
-                    Reason = chooseOptionIntent.SessionId
-                });
-                _context.Batches.Add(batch);
-                return batch;
-            }
-            else if (intent is ActivateRelicIntent activateRelicIntent)
-            {
-                _queue.Enqueue(new ActivateRelicAction(_context, activateRelicIntent));
-            }
-            else
-            {
-                DomainEventBatch rejected = new DomainEventBatch(0, intent);
-                rejected.Add(new DomainEvent(DomainEventType.IntentRejected) { Reason = "UnsupportedIntent" });
-                _context.Batches.Add(rejected);
-                return rejected;
-            }
+                    _queue.Enqueue(new PlayerMoveAction(_context, moveIntent));
+                }
+                else if (intent is InteractWithCardIntent interactIntent)
+                {
+                    _queue.Enqueue(new PlayerInteractAction(_context, interactIntent));
+                }
+                else if (intent is StoreItemIntent storeItemIntent)
+                {
+                    _queue.Enqueue(new StoreItemAction(_context, storeItemIntent));
+                }
+                else if (intent is UseItemIntent useItemIntent)
+                {
+                    _queue.Enqueue(new UseItemAction(_context, useItemIntent));
+                }
+                else if (intent is ChooseOptionIntent chooseOptionIntent)
+                {
+                    if (!_context.ChoiceSessions.TryResolve(chooseOptionIntent.SessionId, chooseOptionIntent.OptionIndex, out ChoiceSession session))
+                    {
+                        return RejectIntent(chooseOptionIntent, "ChoiceResolveFailed");
+                    }
 
-            await _executor.ExecuteAllAsync();
-            return _context.Batches.Count > beforeCount ? _context.Batches[_context.Batches.Count - 1] : null;
+                    DomainEventBatch batch = new DomainEventBatch(0, chooseOptionIntent);
+                    batch.Add(new DomainEvent(DomainEventType.ChoiceResolved)
+                    {
+                        Amount = chooseOptionIntent.OptionIndex,
+                        SecondaryAmount = session.OptionCount,
+                        Reason = chooseOptionIntent.SessionId
+                    });
+                    _context.Batches.Add(batch);
+                    return batch;
+                }
+                else if (intent is ActivateRelicIntent activateRelicIntent)
+                {
+                    _queue.Enqueue(new ActivateRelicAction(_context, activateRelicIntent));
+                }
+                else
+                {
+                    return RejectIntent(intent, "UnsupportedIntent");
+                }
+
+                await _executor.ExecuteAllAsync().ConfigureAwait(false);
+                return _context.Batches.Count > beforeCount ? _context.Batches[_context.Batches.Count - 1] : null;
+            }
+            finally
+            {
+                _submitDepth.Value--;
+                _submitGate.Release();
+            }
+        }
+
+        private DomainEventBatch RejectIntent(PlayerIntent intent, string reason)
+        {
+            DomainEventBatch rejected = new DomainEventBatch(0, intent);
+            rejected.Add(new DomainEvent(DomainEventType.IntentRejected) { Reason = reason });
+            _context.Batches.Add(rejected);
+            return rejected;
         }
     }
 }

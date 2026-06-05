@@ -130,17 +130,41 @@ namespace Game.Core.Actions
     {
         private readonly ActionQueueSet _queueSet;
         private readonly GameActionExecutionContext _context = new GameActionExecutionContext();
+        private readonly object _executionLock = new object();
+        private Task _runningTask;
 
         public ActionExecutor(ActionQueueSet queueSet)
         {
             _queueSet = queueSet;
         }
 
-        public bool IsRunning { get; private set; }
-
-        public async Task ExecuteAllAsync()
+        public bool IsRunning
         {
-            IsRunning = true;
+            get
+            {
+                lock (_executionLock)
+                {
+                    return _runningTask != null;
+                }
+            }
+        }
+
+        public Task ExecuteAllAsync()
+        {
+            lock (_executionLock)
+            {
+                if (_runningTask != null)
+                {
+                    return _runningTask;
+                }
+
+                _runningTask = RunAllAsync();
+                return _runningTask;
+            }
+        }
+
+        private async Task RunAllAsync()
+        {
             try
             {
                 while (_queueSet.TryDequeue(out GameAction action))
@@ -150,7 +174,10 @@ namespace Game.Core.Actions
             }
             finally
             {
-                IsRunning = false;
+                lock (_executionLock)
+                {
+                    _runningTask = null;
+                }
             }
         }
     }

@@ -488,6 +488,113 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void SubmitIntentAsync_SerializesConcurrentCalls()
+        {
+            Await(async () =>
+            {
+                TaskCompletionSource<bool> entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                TaskCompletionSource<bool> release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                ModelId observerModelId = new ModelId("test", "serial-observer");
+                ModelDb.Register(new TestBlockingMonsterModel(observerModelId, entered, release));
+
+                GridState grid = NewGridWithPlayer();
+                CardInstance observer = new CardInstance(new CardInstanceId(2), observerModelId, CardType.Monster);
+                observer.ConfigureCombatStats(6, 0, 0);
+                grid.AddCardToGrid(observer, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                DomainFacade facade = new DomainFacade(context);
+
+                Task<DomainEventBatch> firstTask = facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(9)));
+                await entered.Task;
+
+                Task<DomainEventBatch> secondTask = facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(6)));
+                await Task.Yield();
+                Assert.IsFalse(secondTask.IsCompleted);
+
+                release.SetResult(true);
+                DomainEventBatch firstBatch = await firstTask;
+                DomainEventBatch secondBatch = await secondTask;
+
+                Assert.AreEqual(2, context.ActionCounter.Value);
+                Assert.AreEqual(GridCoord.FromCellIndex(6), grid.PlayerCard.Coord.Value);
+                Assert.AreSame(firstBatch, context.Batches[0]);
+                Assert.AreSame(secondBatch, context.Batches[1]);
+                Assert.IsTrue(firstBatch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
+                Assert.IsTrue(secondBatch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
+            });
+        }
+
+        [Test]
+        public void SubmitIntentAsync_RejectsReentrantSubmissionFromHook()
+        {
+            Await(async () =>
+            {
+                DomainEventBatch reentrantBatch = null;
+                DomainFacade facade = null;
+                ModelId observerModelId = new ModelId("test", "reentrant-observer");
+                ModelDb.Register(new TestReentrantMonsterModel(
+                    observerModelId,
+                    async ctx =>
+                    {
+                        reentrantBatch = await facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(6)));
+                    }));
+
+                GridState grid = NewGridWithPlayer();
+                CardInstance observer = new CardInstance(new CardInstanceId(2), observerModelId, CardType.Monster);
+                observer.ConfigureCombatStats(6, 0, 0);
+                grid.AddCardToGrid(observer, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                facade = new DomainFacade(context);
+
+                DomainEventBatch batch = await facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(9)));
+
+                Assert.IsNotNull(reentrantBatch);
+                Assert.IsTrue(reentrantBatch.Events.Any(e => e.EventType == DomainEventType.IntentRejected && e.Reason == "SubmitIntentReentrant"));
+                Assert.AreEqual(1, context.ActionCounter.Value);
+                Assert.AreEqual(GridCoord.FromCellIndex(9), grid.PlayerCard.Coord.Value);
+                Assert.AreSame(batch, context.Batches[1]);
+            });
+        }
+
+        [Test]
+        public void TraitLifecycle_DispatchesFlipActionAndRemoveCallbacks()
+        {
+            Await(async () =>
+            {
+                ModelId traitId = new ModelId("test", "lifecycle-trait");
+                TestTraitModel trait = new TestTraitModel(traitId);
+                ModelDb.Register(trait);
+
+                ModelId monsterModelId = new ModelId("test", "trait-host");
+                ModelDb.Register(new TestMonsterModel(monsterModelId, 6, 1, 0, new[] { traitId }));
+
+                GridState grid = NewGridWithPlayer();
+                CardInstance monster = new CardInstance(new CardInstanceId(2), monsterModelId, CardType.Monster);
+                monster.ConfigureCombatStats(6, 1, 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), false);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+
+                List<DomainEvent> flipEvents = new List<DomainEvent>();
+                flipEvents.AddRange(grid.FlipCard(monster, FlipReason.Scripted).Events);
+                await context.ProcessLifecycleAsync(flipEvents);
+
+                List<DomainEvent> actionEvents = new List<DomainEvent>();
+                await context.NotifyAfterPlayerActionCommittedAsync(new MovePlayerIntent(GridCoord.FromCellIndex(9)), actionEvents);
+
+                List<DomainEvent> removeEvents = new List<DomainEvent>();
+                removeEvents.AddRange(grid.RemoveCard(monster, RemoveReason.Destroyed).Events);
+                await context.ProcessLifecycleAsync(removeEvents);
+
+                Assert.AreEqual(monster.InstanceId, trait.LastFlippedCardId);
+                Assert.AreEqual(FlipReason.Scripted.ToString(), trait.LastFlipReason);
+                Assert.AreEqual(monster.InstanceId, trait.LastActionObservedCardId);
+                Assert.AreEqual(0, trait.LastActionIndex);
+                Assert.AreEqual(monster.InstanceId, trait.LastRemovedCardId);
+                Assert.AreEqual(RemoveReason.Destroyed.ToString(), trait.LastRemoveReason);
+            });
+        }
+
+        [Test]
         public void DungeonMapGenerator_CreatesDesignNineNodeLayer()
         {
             DungeonMapGenerator generator = new DungeonMapGenerator();
@@ -584,6 +691,104 @@ namespace Game.Core.Tests
             }
         }
 
+        private sealed class TestTraitModel : TraitModel
+        {
+            public TestTraitModel(ModelId id)
+            {
+                Id = id;
+            }
+
+            public override ModelId Id { get; }
+            public CardInstanceId LastFlippedCardId { get; private set; }
+            public string LastFlipReason { get; private set; }
+            public CardInstanceId LastActionObservedCardId { get; private set; }
+            public int LastActionIndex { get; private set; } = -1;
+            public CardInstanceId LastRemovedCardId { get; private set; }
+            public string LastRemoveReason { get; private set; }
+
+            public override Task OnCardFlippedAsync(CardRevealContext ctx)
+            {
+                LastFlippedCardId = ctx.Card.InstanceId;
+                LastFlipReason = ctx.Reason;
+                return Task.CompletedTask;
+            }
+
+            public override Task OnPlayerActionCommittedAsync(PlayerActionContext ctx)
+            {
+                LastActionObservedCardId = ctx.ObservedCard.InstanceId;
+                LastActionIndex = ctx.ActionIndex;
+                return Task.CompletedTask;
+            }
+
+            public override Task OnCardRemovedAsync(CardDestroyedContext ctx)
+            {
+                LastRemovedCardId = ctx.Card.InstanceId;
+                LastRemoveReason = ctx.Reason;
+                return Task.CompletedTask;
+            }
+        }
+
+        private sealed class TestBlockingMonsterModel : MonsterCardModel
+        {
+            private readonly TaskCompletionSource<bool> _entered;
+            private readonly TaskCompletionSource<bool> _release;
+            private bool _hasBlocked;
+
+            public TestBlockingMonsterModel(ModelId id, TaskCompletionSource<bool> entered, TaskCompletionSource<bool> release)
+            {
+                Id = id;
+                _entered = entered;
+                _release = release;
+            }
+
+            public override ModelId Id { get; }
+            public override int Level => 1;
+            public override int MaxHp => 6;
+            public override int Attack => 0;
+            public override int Defense => 0;
+
+            public override async Task OnAfterPlayerActionCommittedAsync(PlayerActionContext ctx)
+            {
+                if (_hasBlocked)
+                {
+                    return;
+                }
+
+                _hasBlocked = true;
+                _entered.TrySetResult(true);
+                await _release.Task;
+            }
+        }
+
+        private sealed class TestReentrantMonsterModel : MonsterCardModel
+        {
+            private readonly System.Func<PlayerActionContext, Task> _afterAction;
+            private bool _hasSubmitted;
+
+            public TestReentrantMonsterModel(ModelId id, System.Func<PlayerActionContext, Task> afterAction)
+            {
+                Id = id;
+                _afterAction = afterAction;
+            }
+
+            public override ModelId Id { get; }
+            public override int Level => 1;
+            public override int MaxHp => 6;
+            public override int Attack => 0;
+            public override int Defense => 0;
+
+            public override Task OnAfterPlayerActionCommittedAsync(PlayerActionContext ctx)
+            {
+                if (_hasSubmitted || _afterAction == null)
+                {
+                    return Task.CompletedTask;
+                }
+
+                _hasSubmitted = true;
+                return _afterAction(ctx);
+            }
+        }
+
         private static GridState NewGridWithPlayer()
         {
             GridState grid = new GridState();
@@ -638,12 +843,14 @@ namespace Game.Core.Tests
             private readonly int _maxHp;
             private readonly int _attack;
             private readonly int _defense;
-            public TestMonsterModel(ModelId id, int maxHp, int attack, int defense) { Id = id; _maxHp = maxHp; _attack = attack; _defense = defense; }
+            private readonly IReadOnlyList<ModelId> _traitIds;
+            public TestMonsterModel(ModelId id, int maxHp, int attack, int defense, IReadOnlyList<ModelId> traitIds = null) { Id = id; _maxHp = maxHp; _attack = attack; _defense = defense; _traitIds = traitIds ?? System.Array.Empty<ModelId>(); }
             public override ModelId Id { get; }
             public override int Level => 1;
             public override int MaxHp => _maxHp;
             public override int Attack => _attack;
             public override int Defense => _defense;
+            public override IReadOnlyList<ModelId> TraitIds => _traitIds;
         }
 
         private sealed class TestTrapModel : TrapCardModel
