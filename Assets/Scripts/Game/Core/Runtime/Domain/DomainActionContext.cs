@@ -23,12 +23,13 @@ namespace Game.Core.Domain
             Grid = grid ?? throw new ArgumentNullException(nameof(grid));
             ActionCounter = actionCounter ?? throw new ArgumentNullException(nameof(actionCounter));
             Combat = new CombatResolution(grid);
+            Combat.Domain = this;
             RoomClearChecker = new RoomClearChecker();
             ItemInventory = new PlayerInventory();
             Relics = new RelicInventory();
         }
 
-        public GridState Grid { get; }
+        public GridState Grid { get; internal set; }
         public PlayerActionCounter ActionCounter { get; }
         public CombatResolution Combat { get; }
         public RoomClearChecker RoomClearChecker { get; }
@@ -37,6 +38,11 @@ namespace Game.Core.Domain
         public PlayerInventory ItemInventory { get; }
         public RelicInventory Relics { get; }
         public int PlayerGold { get; private set; }
+
+        public void SetPlayerGold(int value)
+        {
+            PlayerGold = Math.Max(0, value);
+        }
         public List<DomainEventBatch> Batches { get; } = new List<DomainEventBatch>();
 
         public CardModel ResolveCardModel(CardInstance card)
@@ -220,5 +226,167 @@ namespace Game.Core.Domain
                 Reason = reason
             });
         }
+
+        #region Combat Hooks
+
+        public async Task NotifyBeforeDamageAsync(DamageContext ctx)
+        {
+            if (ctx == null)
+            {
+                return;
+            }
+
+            await NotifyRelicHooksAsync(r => r.OnBeforeDamageAsync(ctx)).ConfigureAwait(false);
+            await NotifyCardTraitHooksAsync(ctx.SourceCard, t => t.OnBeforeDamageAsync(ctx)).ConfigureAwait(false);
+            await NotifyCardTraitHooksAsync(ctx.TargetCard, t => t.OnBeforeDamageAsync(ctx)).ConfigureAwait(false);
+        }
+
+        public async Task NotifyAfterDamageAsync(DamageContext ctx, DamageResult result)
+        {
+            if (ctx == null)
+            {
+                return;
+            }
+
+            await NotifyRelicHooksAsync(r => r.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
+            await NotifyCardTraitHooksAsync(ctx.SourceCard, t => t.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
+            await NotifyCardTraitHooksAsync(ctx.TargetCard, t => t.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
+        }
+
+        public async Task<int> ModifyDamageDealtAsync(DamageContext ctx, int current)
+        {
+            if (ctx == null)
+            {
+                return current;
+            }
+
+            int value = current;
+
+            foreach (ModelId relicId in Relics.AllRelics)
+            {
+                if (TryResolveRelicModel(relicId, out RelicModel relic))
+                {
+                    value = relic.ModifyDamageDealt(ctx, value);
+                }
+            }
+
+            if (ctx.SourceCard != null)
+            {
+                value = ModifyDamageByCardTraits(ctx.SourceCard, t => t.ModifyDamageDealt(ctx, value), value);
+            }
+
+            return value;
+        }
+
+        public async Task<int> ModifyDamageTakenAsync(DamageContext ctx, int current)
+        {
+            if (ctx == null)
+            {
+                return current;
+            }
+
+            int value = current;
+
+            foreach (ModelId relicId in Relics.AllRelics)
+            {
+                if (TryResolveRelicModel(relicId, out RelicModel relic))
+                {
+                    value = relic.ModifyDamageTaken(ctx, value);
+                }
+            }
+
+            if (ctx.TargetCard != null)
+            {
+                value = ModifyDamageByCardTraits(ctx.TargetCard, t => t.ModifyDamageTaken(ctx, value), value);
+            }
+
+            // Notify field observers (face-up monsters/traps) — ordered by cell index, top-first
+            foreach (CardInstance card in Grid.AllGridCards)
+            {
+                if (card.CardType == CardType.Player || !card.IsFaceUp)
+                {
+                    continue;
+                }
+
+                if (card.InstanceId == ctx.SourceCard?.InstanceId || card.InstanceId == ctx.TargetCard?.InstanceId)
+                {
+                    continue;
+                }
+
+                value = ModifyDamageByCardTraits(card, t => t.ModifyDamageTaken(ctx, value), value);
+            }
+
+            return value;
+        }
+
+        private async Task NotifyRelicHooksAsync(Func<RelicModel, Task> notify)
+        {
+            foreach (ModelId relicId in Relics.AllRelics)
+            {
+                if (TryResolveRelicModel(relicId, out RelicModel relic))
+                {
+                    await notify(relic).ConfigureAwait(false);
+                }
+            }
+        }
+
+        private async Task NotifyCardTraitHooksAsync(CardInstance card, Func<TraitModel, Task> notify)
+        {
+            if (card == null)
+            {
+                return;
+            }
+
+            if (!TryResolveCardModel(card, out CardModel model))
+            {
+                return;
+            }
+
+            IReadOnlyList<ModelId> traitIds = GetTraitIdsFromModel(model);
+            foreach (ModelId traitId in traitIds)
+            {
+                if (ModelDb.TryGet(traitId, out TraitModel trait))
+                {
+                    await notify(trait).ConfigureAwait(false);
+                }
+            }
+        }
+
+        private int ModifyDamageByCardTraits(CardInstance card, Func<TraitModel, int> modify, int current)
+        {
+            if (card == null)
+            {
+                return current;
+            }
+
+            if (!TryResolveCardModel(card, out CardModel model))
+            {
+                return current;
+            }
+
+            int value = current;
+            IReadOnlyList<ModelId> traitIds = GetTraitIdsFromModel(model);
+            foreach (ModelId traitId in traitIds)
+            {
+                if (ModelDb.TryGet(traitId, out TraitModel trait))
+                {
+                    value = modify(trait);
+                }
+            }
+
+            return value;
+        }
+
+        private static IReadOnlyList<ModelId> GetTraitIdsFromModel(CardModel model)
+        {
+            if (model is MonsterCardModel monster)
+            {
+                return monster.TraitIds;
+            }
+
+            return Array.Empty<ModelId>();
+        }
+
+        #endregion
     }
 }

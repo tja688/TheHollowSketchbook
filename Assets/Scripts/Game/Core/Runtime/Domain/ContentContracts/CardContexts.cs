@@ -57,9 +57,9 @@ namespace Game.Core.Domain.ContentContracts
             }
         }
 
-        public DamageResult ApplyDamage(DamageInfo info)
+        public async Task<DamageResult> ApplyDamageAsync(DamageInfo info)
         {
-            return Domain.Combat.ApplyDamage(info, Events);
+            return await Domain.Combat.ApplyDamageAsync(info, Events).ConfigureAwait(false);
         }
     }
 
@@ -225,9 +225,9 @@ namespace Game.Core.Domain.ContentContracts
             }
         }
 
-        public DamageResult ApplyDamage(DamageInfo info)
+        public async Task<DamageResult> ApplyDamageAsync(DamageInfo info)
         {
-            return Domain.Combat.ApplyDamage(info, Events);
+            return await Domain.Combat.ApplyDamageAsync(info, Events).ConfigureAwait(false);
         }
     }
 }

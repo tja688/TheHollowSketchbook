@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Game.Core.Domain.Cards;
+using Game.Core.Domain.ContentContracts;
 using Game.Core.Domain.Events;
 using Game.Core.Domain.Grid;
 
@@ -15,7 +17,9 @@ namespace Game.Core.Domain.Combat
             _grid = grid ?? throw new ArgumentNullException(nameof(grid));
         }
 
-        public DamageResult ApplyDamage(DamageInfo info, ICollection<DomainEvent> events)
+        public DomainActionContext Domain { get; set; }
+
+        public async Task<DamageResult> ApplyDamageAsync(DamageInfo info, ICollection<DomainEvent> events)
         {
             if (!_grid.TryGetCard(info.Target.CardId, out CardInstance target))
             {
@@ -34,8 +38,23 @@ namespace Game.Core.Domain.Combat
                 };
             }
 
+            _grid.TryGetCard(info.Source.CardId, out CardInstance sourceCard);
+            DamageContext damageCtx = new DamageContext(info, sourceCard, target);
+
+            // Phase 1: BeforeDamage hooks
+            await NotifyBeforeDamageAsync(damageCtx).ConfigureAwait(false);
+
             int amount = info.BaseAmount;
+
+            // Phase 2: ModifyDamageDealt (source-side hooks)
+            amount = await ModifyDamageDealtAsync(damageCtx, amount).ConfigureAwait(false);
+
+            // Phase 3: Defense reduction
             int reduced = info.IgnoreDefense ? amount : Math.Max(0, amount - target.Defense);
+
+            // Phase 4: ModifyDamageTaken (target-side hooks)
+            reduced = await ModifyDamageTakenAsync(damageCtx, reduced).ConfigureAwait(false);
+
             int hpLoss;
             bool prevented = false;
 
@@ -69,99 +88,139 @@ namespace Game.Core.Domain.Combat
                 Reason = info.Reason + (prevented ? ":Prevented" : string.Empty)
             });
 
+            // Phase 5: AfterDamage hooks
+            await NotifyAfterDamageAsync(damageCtx, result).ConfigureAwait(false);
+
             return result;
         }
 
-        public void ResolvePlayerVsMonster(CardInstance player, CardInstance monster, ICollection<DomainEvent> events)
+        public async Task ResolvePlayerVsMonsterAsync(CardInstance player, CardInstance monster, ICollection<DomainEvent> events)
         {
             bool playerFirst = HasFirstStrike(player);
             bool monsterFirst = HasFirstStrike(monster);
 
             if (playerFirst && !monsterFirst)
             {
-                // 玩家先攻
-                DamageResult playerHit = ApplyDamage(new DamageInfo(
+                DamageResult playerHit = await ApplyDamageAsync(new DamageInfo(
                     DamageSource.FromCard(player.InstanceId),
                     DamageTarget.Card(monster.InstanceId),
                     player.Attack,
                     DamageKind.Attack,
                     false,
-                    "PlayerAttackMonster"), events);
+                    "PlayerAttackMonster"), events).ConfigureAwait(false);
 
                 if (!playerHit.Killed)
                 {
-                    ApplyDamage(new DamageInfo(
+                    await ApplyDamageAsync(new DamageInfo(
                         DamageSource.FromCard(monster.InstanceId),
                         DamageTarget.Card(player.InstanceId),
                         monster.Attack,
                         DamageKind.Attack,
                         false,
-                        "MonsterCounterAttack"), events);
+                        "MonsterCounterAttack"), events).ConfigureAwait(false);
                 }
             }
             else if (monsterFirst && !playerFirst)
             {
-                // 怪物先攻
-                DamageResult monsterHit = ApplyDamage(new DamageInfo(
+                DamageResult monsterHit = await ApplyDamageAsync(new DamageInfo(
                     DamageSource.FromCard(monster.InstanceId),
                     DamageTarget.Card(player.InstanceId),
                     monster.Attack,
                     DamageKind.Attack,
                     false,
-                    "MonsterAttackPlayer"), events);
+                    "MonsterAttackPlayer"), events).ConfigureAwait(false);
 
                 if (!monsterHit.Killed)
                 {
-                    ApplyDamage(new DamageInfo(
+                    await ApplyDamageAsync(new DamageInfo(
                         DamageSource.FromCard(player.InstanceId),
                         DamageTarget.Card(monster.InstanceId),
                         player.Attack,
                         DamageKind.Attack,
                         false,
-                        "PlayerCounterAttack"), events);
+                        "PlayerCounterAttack"), events).ConfigureAwait(false);
                 }
             }
             else
             {
-                // 双方同时先攻（都有先攻）或都不先攻时，按设计文档同时受到伤害
-                ApplyDamage(new DamageInfo(
+                await ApplyDamageAsync(new DamageInfo(
                     DamageSource.FromCard(player.InstanceId),
                     DamageTarget.Card(monster.InstanceId),
                     player.Attack,
                     DamageKind.Attack,
                     false,
-                    "PlayerAttackMonster"), events);
+                    "PlayerAttackMonster"), events).ConfigureAwait(false);
 
-                ApplyDamage(new DamageInfo(
+                await ApplyDamageAsync(new DamageInfo(
                     DamageSource.FromCard(monster.InstanceId),
                     DamageTarget.Card(player.InstanceId),
                     monster.Attack,
                     DamageKind.Attack,
                     false,
-                    "MonsterCounterAttack"), events);
+                    "MonsterCounterAttack"), events).ConfigureAwait(false);
             }
         }
 
-        public void ResolvePlayerVsTrap(CardInstance player, CardInstance trap, ICollection<DomainEvent> events)
+        public async Task ResolvePlayerVsTrapAsync(CardInstance player, CardInstance trap, ICollection<DomainEvent> events)
         {
-            ApplyDamage(new DamageInfo(
+            await ApplyDamageAsync(new DamageInfo(
                 DamageSource.FromCard(player.InstanceId),
                 DamageTarget.Card(trap.InstanceId),
                 player.Attack,
                 DamageKind.Attack,
                 false,
-                "PlayerAttackTrap"), events);
+                "PlayerAttackTrap"), events).ConfigureAwait(false);
 
             if (trap.ContactDamageToPlayer > 0)
             {
-                ApplyDamage(new DamageInfo(
+                await ApplyDamageAsync(new DamageInfo(
                     DamageSource.FromCard(trap.InstanceId),
                     DamageTarget.Card(player.InstanceId),
                     trap.ContactDamageToPlayer,
                     DamageKind.Trap,
                     true,
-                    "TrapContactDamage"), events);
+                    "TrapContactDamage"), events).ConfigureAwait(false);
             }
+        }
+
+        private async Task NotifyBeforeDamageAsync(DamageContext ctx)
+        {
+            if (Domain == null)
+            {
+                return;
+            }
+
+            await Domain.NotifyBeforeDamageAsync(ctx).ConfigureAwait(false);
+        }
+
+        private async Task NotifyAfterDamageAsync(DamageContext ctx, DamageResult result)
+        {
+            if (Domain == null)
+            {
+                return;
+            }
+
+            await Domain.NotifyAfterDamageAsync(ctx, result).ConfigureAwait(false);
+        }
+
+        private async Task<int> ModifyDamageDealtAsync(DamageContext ctx, int current)
+        {
+            if (Domain == null)
+            {
+                return current;
+            }
+
+            return await Domain.ModifyDamageDealtAsync(ctx, current).ConfigureAwait(false);
+        }
+
+        private async Task<int> ModifyDamageTakenAsync(DamageContext ctx, int current)
+        {
+            if (Domain == null)
+            {
+                return current;
+            }
+
+            return await Domain.ModifyDamageTakenAsync(ctx, current).ConfigureAwait(false);
         }
 
         private static bool HasFirstStrike(CardInstance card)

@@ -1,7 +1,7 @@
 # L1 开发 AI 快速执行手册
 
 > 读者：只负责具体内容或小功能落地的 L1 开发 AI。目标：让你安全调用现有领域层，不破坏核心架构。  
-> **更新日期**: 2026-06-05 — 已同步 CardModel 生命周期接口、虚方法分派、先攻/伤害免疫、Inventory 系统、存档 DTO 扩展。
+> **更新日期**: 2026-06-05 — 已同步 CardModel 生命周期接口、虚方法分派、先攻/伤害免疫、Inventory 系统、存档完整 Restore、RelicModel Damage Hook。
 
 ---
 
@@ -61,6 +61,8 @@ Unity 编译
 | 玩家输入预览 | `DomainFacade.PreviewIntent(intent)` |
 | 提交玩家意图 | `DomainFacade.SubmitIntentAsync(intent)` |
 | 基础伤害 | `CombatResolution.ApplyDamage(info, events)` |
+| 遗物修改伤害 | 覆盖 `RelicModel.ModifyDamageDealt` / `ModifyDamageTaken` |
+| 伤害前后异步响应 | 覆盖 `RelicModel.OnBeforeDamageAsync` / `OnAfterDamageAsync` |
 | 玩家行动计数 | `PlayerActionCounter.Value`，只能由领域动作递增 |
 | 检查不变量 | `DomainInvariantValidator.Validate(grid)` |
 | 收入道具栏 | `StoreItemIntent(cardId)` → `DomainFacade.SubmitIntentAsync` |
@@ -111,6 +113,12 @@ public virtual Task OnAfterPlayerActionCommittedAsync(PlayerActionContext ctx) =
 // MonsterCardModel 已默认实现 OnPlayerInteractAsync = ResolvePlayerVsMonster
 // TrapCardModel 已默认实现 OnPlayerInteractAsync = ResolvePlayerVsTrap
 // ItemCardModel 已默认 CanInteractWithPlayer = false，需实现 UseAsync
+
+// RelicModel 专属 — 伤害 Hook（执行顺序：被动遗物 → 主动槽）
+public virtual int ModifyDamageDealt(DamageContext ctx, int current) => current;   // 防御前修改源端伤害
+public virtual int ModifyDamageTaken(DamageContext ctx, int current) => current;   // 防御后修改实际承受
+public virtual Task OnBeforeDamageAsync(DamageContext ctx) => Task.CompletedTask; // 伤害生效前
+public virtual Task OnAfterDamageAsync(DamageContext ctx, DamageResult result) => Task.CompletedTask; // 伤害生效后
 ```
 
 **时序提示**：
@@ -147,7 +155,7 @@ public virtual Task OnAfterPlayerActionCommittedAsync(PlayerActionContext ctx) =
 
 - 需要新增或修改领域公共 API（GridState、CombatResolution、IntentValidator 等）。
 - 需要改变行动计数、翻牌、移除、金币、清场语义。
-- 内容需求依赖尚未定义的基础设施，如"房间生成管线""存档完整 Restore"。
+- 内容需求依赖尚未定义的基础设施，如"房间生成管线"。（存档 Restore 已完整落地，不再阻塞）
 - 需要新增表现 Cue 或修改 Manifest。
 - 测试发现设计文档与当前实现冲突。
 - 需要修改存档、RNG、ActionQueue、ModelDb。

@@ -9,13 +9,21 @@ using Game.Core.Domain.Combat;
 using Game.Core.Domain.Events;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
+using Game.Core.Domain.ContentContracts;
 using Game.Core.Domain.Validation;
+using Game.Core.Models;
 using NUnit.Framework;
 
 namespace Game.Core.Tests
 {
     public sealed class DomainP0Tests
     {
+        [SetUp]
+        public void SetUp()
+        {
+            ModelDb.Clear();
+        }
+
         [Test]
         public void GridCoord_ConvertsCellIndexAndNeighbors()
         {
@@ -45,57 +53,66 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public async Task PlayerMove_ToEmptyCellCountsActionAndRevealsAdjacentTopCards()
+        public void PlayerMove_ToEmptyCellCountsActionAndRevealsAdjacentTopCards()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance faceDown = NewCard(2, CardType.Monster, hp: 6);
-            grid.AddCardToGrid(faceDown, GridCoord.FromCellIndex(6), false);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            DomainFacade facade = new DomainFacade(context);
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance faceDown = NewCard(2, CardType.Monster, hp: 6);
+                grid.AddCardToGrid(faceDown, GridCoord.FromCellIndex(6), false);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                DomainFacade facade = new DomainFacade(context);
 
-            DomainEventBatch batch = await facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(9)));
+                DomainEventBatch batch = await facade.SubmitIntentAsync(new MovePlayerIntent(GridCoord.FromCellIndex(9)));
 
-            Assert.AreEqual(1, context.ActionCounter.Value);
-            Assert.AreEqual(GridCoord.FromCellIndex(9), grid.PlayerCard.Coord.Value);
-            Assert.IsTrue(faceDown.IsFaceUp);
-            Assert.IsTrue(batch.Events.Any(evt => evt.EventType == DomainEventType.PlayerActionCommitted));
-            Assert.IsTrue(batch.Events.Any(evt => evt.EventType == DomainEventType.CardFlipped && evt.CardId == faceDown.InstanceId));
+                Assert.AreEqual(1, context.ActionCounter.Value);
+                Assert.AreEqual(GridCoord.FromCellIndex(9), grid.PlayerCard.Coord.Value);
+                Assert.IsTrue(faceDown.IsFaceUp);
+                Assert.IsTrue(batch.Events.Any(evt => evt.EventType == DomainEventType.PlayerActionCommitted));
+                Assert.IsTrue(batch.Events.Any(evt => evt.EventType == DomainEventType.CardFlipped && evt.CardId == faceDown.InstanceId));
+            });
         }
 
         [Test]
-        public async Task InteractWithMonster_PlayerPositionStaysAndDeadMonsterRemovedWithGold()
+        public void InteractWithMonster_PlayerPositionStaysAndDeadMonsterRemovedWithGold()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance player = grid.PlayerCard;
-            player.ConfigureCombatStats(20, 5, 1, 0, 0);
-            CardInstance monster = NewCard(2, CardType.Monster, hp: 4, attack: 3, defense: 0);
-            grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            DomainFacade facade = new DomainFacade(context);
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 1, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 4, attack: 3, defense: 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                DomainFacade facade = new DomainFacade(context);
 
-            await facade.SubmitIntentAsync(new InteractWithCardIntent(monster.InstanceId));
+                await facade.SubmitIntentAsync(new InteractWithCardIntent(monster.InstanceId));
 
-            Assert.AreEqual(GridCoord.FromCellIndex(8), player.Coord.Value);
-            Assert.AreEqual(1, context.ActionCounter.Value);
-            Assert.AreEqual(CardZone.Removed, monster.Zone);
-            Assert.AreEqual(10, context.PlayerGold);
-            Assert.IsTrue(context.Batches.Last().Events.Any(evt => evt.EventType == DomainEventType.MonsterDefeated));
-            Assert.IsTrue(context.Batches.Last().Events.Any(evt => evt.EventType == DomainEventType.RoomCleared));
+                Assert.AreEqual(GridCoord.FromCellIndex(8), player.Coord.Value);
+                Assert.AreEqual(1, context.ActionCounter.Value);
+                Assert.AreEqual(CardZone.Removed, monster.Zone);
+                Assert.AreEqual(10, context.PlayerGold);
+                Assert.IsTrue(context.Batches.Last().Events.Any(evt => evt.EventType == DomainEventType.MonsterDefeated));
+                Assert.IsTrue(context.Batches.Last().Events.Any(evt => evt.EventType == DomainEventType.RoomCleared));
+            });
         }
 
         [Test]
-        public async Task InvalidInteractWithFaceDownCardIsRejectedAndDoesNotCountAction()
+        public void InvalidInteractWithFaceDownCardIsRejectedAndDoesNotCountAction()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance monster = NewCard(2, CardType.Monster, hp: 4);
-            grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), false);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            DomainFacade facade = new DomainFacade(context);
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 4);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), false);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                DomainFacade facade = new DomainFacade(context);
 
-            DomainEventBatch batch = await facade.SubmitIntentAsync(new InteractWithCardIntent(monster.InstanceId));
+                DomainEventBatch batch = await facade.SubmitIntentAsync(new InteractWithCardIntent(monster.InstanceId));
 
-            Assert.AreEqual(0, context.ActionCounter.Value);
-            Assert.IsTrue(batch.Events.Any(evt => evt.EventType == DomainEventType.IntentRejected && evt.Reason == "TargetFaceDown"));
+                Assert.AreEqual(0, context.ActionCounter.Value);
+                Assert.IsTrue(batch.Events.Any(evt => evt.EventType == DomainEventType.IntentRejected && evt.Reason == "TargetFaceDown"));
+            });
         }
 
         [Test]
@@ -118,18 +135,21 @@ namespace Game.Core.Tests
         [Test]
         public void CombatResolution_AppliesDefenseAndTrapIgnoresPlayerDefense()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance player = grid.PlayerCard;
-            player.ConfigureCombatStats(20, 5, 3, 0, 0);
-            CardInstance trap = NewCard(2, CardType.Trap, hp: 6, attack: 0, defense: 2, contactDamage: 4);
-            grid.AddCardToGrid(trap, GridCoord.FromCellIndex(5), true);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            int oldPlayerHp = player.CurrentHp;
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 3, 0, 0);
+                CardInstance trap = NewCard(2, CardType.Trap, hp: 6, attack: 0, defense: 2, contactDamage: 4);
+                grid.AddCardToGrid(trap, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                int oldPlayerHp = player.CurrentHp;
 
-            context.Combat.ResolvePlayerVsTrap(player, trap, null);
+                await context.Combat.ResolvePlayerVsTrapAsync(player, trap, null);
 
-            Assert.AreEqual(3, trap.CurrentHp);
-            Assert.AreEqual(oldPlayerHp - 4, player.CurrentHp);
+                Assert.AreEqual(3, trap.CurrentHp);
+                Assert.AreEqual(oldPlayerHp - 4, player.CurrentHp);
+            });
         }
 
         [Test]
@@ -145,128 +165,297 @@ namespace Game.Core.Tests
         [Test]
         public void CombatResolution_FirstStrike_MonsterAttacksFirst()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance player = grid.PlayerCard;
-            player.ConfigureCombatStats(20, 5, 0, 0, 0);
-            CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 20, defense: 0);
-            monster.SetState("firstStrike", 1);
-            grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 0, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 20, defense: 0);
+                monster.SetState("firstStrike", 1);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
 
-            context.Combat.ResolvePlayerVsMonster(player, monster, null);
+                await context.Combat.ResolvePlayerVsMonsterAsync(player, monster, null);
 
-            // Monster has first strike, so it attacks first and kills player.
-            // Player should NOT get a counter-attack because player is dead.
-            Assert.AreEqual(0, player.CurrentHp);
-            Assert.AreEqual(10, monster.CurrentHp); // Player never got to attack
+                // Monster has first strike, so it attacks first and kills player.
+                // Player should NOT get a counter-attack because player is dead.
+                Assert.AreEqual(0, player.CurrentHp);
+                Assert.AreEqual(10, monster.CurrentHp); // Player never got to attack
+            });
         }
 
         [Test]
         public void CombatResolution_SimultaneousDeath_BothDie()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance player = grid.PlayerCard;
-            player.ConfigureCombatStats(5, 5, 0, 0, 0);
-            CardInstance monster = NewCard(2, CardType.Monster, hp: 5, attack: 5, defense: 0);
-            // Both have first strike => simultaneous attack
-            player.SetState("firstStrike", 1);
-            monster.SetState("firstStrike", 1);
-            grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            List<DomainEvent> events = new List<DomainEvent>();
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(5, 5, 0, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 5, attack: 5, defense: 0);
+                // Both have first strike => simultaneous attack
+                player.SetState("firstStrike", 1);
+                monster.SetState("firstStrike", 1);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                List<DomainEvent> events = new List<DomainEvent>();
 
-            context.Combat.ResolvePlayerVsMonster(player, monster, events);
+                await context.Combat.ResolvePlayerVsMonsterAsync(player, monster, events);
 
-            // Both should die because damage is applied simultaneously
-            Assert.AreEqual(0, player.CurrentHp);
-            Assert.AreEqual(0, monster.CurrentHp);
-            Assert.IsTrue(events.Any(e => e.EventType == DomainEventType.DamageApplied && e.Reason.Contains("PlayerAttackMonster")));
-            Assert.IsTrue(events.Any(e => e.EventType == DomainEventType.DamageApplied && e.Reason.Contains("MonsterCounterAttack")));
+                // Both should die because damage is applied simultaneously
+                Assert.AreEqual(0, player.CurrentHp);
+                Assert.AreEqual(0, monster.CurrentHp);
+                Assert.IsTrue(events.Any(e => e.EventType == DomainEventType.DamageApplied && e.Reason.Contains("PlayerAttackMonster")));
+                Assert.IsTrue(events.Any(e => e.EventType == DomainEventType.DamageApplied && e.Reason.Contains("MonsterCounterAttack")));
+            });
         }
 
         [Test]
         public void CombatResolution_DamagePrevention_BlocksDamage()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance player = grid.PlayerCard;
-            player.ConfigureCombatStats(20, 5, 0, 0, 0);
-            CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 3, defense: 0);
-            grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            List<DomainEvent> events = new List<DomainEvent>();
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 0, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 3, defense: 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                List<DomainEvent> events = new List<DomainEvent>();
 
-            // Give player one damage immunity
-            player.SetState("damageImmunity", 1);
-            int oldHp = player.CurrentHp;
+                // Give player one damage immunity
+                player.SetState("damageImmunity", 1);
+                int oldHp = player.CurrentHp;
 
-            DamageInfo info = new DamageInfo(
-                DamageSource.FromCard(monster.InstanceId),
-                DamageTarget.Card(player.InstanceId),
-                3,
-                DamageKind.Attack,
-                false,
-                "TestDamage");
+                DamageInfo info = new DamageInfo(
+                    DamageSource.FromCard(monster.InstanceId),
+                    DamageTarget.Card(player.InstanceId),
+                    3,
+                    DamageKind.Attack,
+                    false,
+                    "TestDamage");
 
-            DamageResult result = context.Combat.ApplyDamage(info, events);
+                DamageResult result = await context.Combat.ApplyDamageAsync(info, events);
 
-            Assert.AreEqual(0, result.HpLoss);
-            Assert.IsTrue(result.Prevented);
-            Assert.AreEqual(oldHp, player.CurrentHp);
-            Assert.AreEqual(0, player.GetState("damageImmunity"));
+                Assert.AreEqual(0, result.HpLoss);
+                Assert.IsTrue(result.Prevented);
+                Assert.AreEqual(oldHp, player.CurrentHp);
+                Assert.AreEqual(0, player.GetState("damageImmunity"));
+            });
         }
 
         [Test]
-        public async Task PlayerDefeated_TriggersRunEnded()
+        public void PlayerDefeated_TriggersRunEnded()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance player = grid.PlayerCard;
-            player.ConfigureCombatStats(5, 5, 0, 0, 0);
-            CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 20, defense: 0);
-            grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            DomainFacade facade = new DomainFacade(context);
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(5, 5, 0, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 20, defense: 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                DomainFacade facade = new DomainFacade(context);
 
-            await facade.SubmitIntentAsync(new InteractWithCardIntent(monster.InstanceId));
+                await facade.SubmitIntentAsync(new InteractWithCardIntent(monster.InstanceId));
 
-            Assert.AreEqual(0, player.CurrentHp);
-            Assert.IsTrue(context.Batches.Any(b => b.Events.Any(e => e.EventType == DomainEventType.RunEnded && e.Reason == "PlayerDefeated")));
+                Assert.AreEqual(0, player.CurrentHp);
+                Assert.IsTrue(context.Batches.Any(b => b.Events.Any(e => e.EventType == DomainEventType.RunEnded && e.Reason == "PlayerDefeated")));
+            });
         }
 
         [Test]
         public void ApplyDamage_NonCreatureTarget_DoesNothing()
         {
-            GridState grid = NewGridWithPlayer();
-            CardInstance gold = NewCard(2, CardType.Gold, hp: 0, attack: 0, defense: 0);
-            grid.AddCardToGrid(gold, GridCoord.FromCellIndex(5), true);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            List<DomainEvent> events = new List<DomainEvent>();
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance gold = NewCard(2, CardType.Gold, hp: 0, attack: 0, defense: 0);
+                grid.AddCardToGrid(gold, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                List<DomainEvent> events = new List<DomainEvent>();
 
-            DamageResult result = context.Combat.ApplyDamage(new DamageInfo(
-                DamageSource.FromCard(grid.PlayerCard.InstanceId),
-                DamageTarget.Card(gold.InstanceId),
-                5,
-                DamageKind.Attack,
-                false,
-                "Test"), events);
+                DamageResult result = await context.Combat.ApplyDamageAsync(new DamageInfo(
+                    DamageSource.FromCard(grid.PlayerCard.InstanceId),
+                    DamageTarget.Card(gold.InstanceId),
+                    5,
+                    DamageKind.Attack,
+                    false,
+                    "Test"), events);
 
-            Assert.AreEqual(0, result.HpLoss);
-            Assert.IsFalse(result.Killed);
+                Assert.AreEqual(0, result.HpLoss);
+                Assert.IsFalse(result.Killed);
+            });
         }
 
         [Test]
-        public async Task StoreItemIntent_MovesItemToInventory()
+        public void StoreItemIntent_MovesItemToInventory()
+        {
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance item = NewCard(2, CardType.Item, hp: 0, attack: 0, defense: 0);
+                grid.AddCardToGrid(item, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                DomainFacade facade = new DomainFacade(context);
+
+                DomainEventBatch batch = await facade.SubmitIntentAsync(new StoreItemIntent(item.InstanceId));
+
+                Assert.AreEqual(CardZone.PlayerInventory, item.Zone);
+                Assert.AreEqual(1, context.ItemInventory.Count);
+                Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.ItemStored));
+            });
+        }
+
+        [Test]
+        public void SaveRestore_RoundTripPreservesGridAndActionCounter()
         {
             GridState grid = NewGridWithPlayer();
-            CardInstance item = NewCard(2, CardType.Item, hp: 0, attack: 0, defense: 0);
-            grid.AddCardToGrid(item, GridCoord.FromCellIndex(5), true);
-            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
-            DomainFacade facade = new DomainFacade(context);
+            CardInstance player = grid.PlayerCard;
+            player.ConfigureCombatStats(20, 5, 1, 0, 0);
+            CardInstance monster = NewCard(2, CardType.Monster, hp: 6, attack: 2, defense: 0);
+            monster.SetState("firstStrike", 1);
+            grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), false);
+            CardInstance trap = NewCard(3, CardType.Trap, hp: 4, attack: 0, defense: 1, contactDamage: 3);
+            grid.AddCardToGrid(trap, GridCoord.FromCellIndex(2), true);
 
-            DomainEventBatch batch = await facade.SubmitIntentAsync(new StoreItemIntent(item.InstanceId));
+            DomainActionContext original = new DomainActionContext(grid, new PlayerActionCounter());
+            original.ActionCounter.Increment(new MovePlayerIntent(GridCoord.FromCellIndex(9)));
+            original.SetPlayerGold(42);
 
-            Assert.AreEqual(CardZone.PlayerInventory, item.Zone);
-            Assert.AreEqual(1, context.ItemInventory.Count);
-            Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.ItemStored));
+            // Capture
+            Game.Core.Saves.RoomDomainStateSaveDto dto = Game.Core.Saves.DomainSaveAdapter.Capture(original);
+
+            // Restore into fresh context
+            GridState freshGrid = NewGridWithPlayer(); // dummy grid to be replaced
+            DomainActionContext restored = new DomainActionContext(freshGrid, new PlayerActionCounter());
+            Game.Core.Saves.DomainSaveAdapter.Restore(dto, restored);
+
+            // Verify Grid restored
+            Assert.IsNotNull(restored.Grid);
+            Assert.AreEqual(3, restored.Grid.AllKnownCards.Count());
+            Assert.AreEqual(42, restored.PlayerGold);
+            Assert.AreEqual(1, restored.ActionCounter.Value);
+
+            // Verify monster restored with state
+            CardInstance restoredMonster = restored.Grid.AllKnownCards.First(c => c.CardType == CardType.Monster);
+            Assert.AreEqual(6, restoredMonster.MaxHp);
+            Assert.AreEqual(2, restoredMonster.Attack);
+            Assert.AreEqual(1, restoredMonster.GetState("firstStrike"));
+            Assert.AreEqual(GridCoord.FromCellIndex(5), restoredMonster.Coord.Value);
+            Assert.IsFalse(restoredMonster.IsFaceUp);
+
+            // Verify trap restored
+            CardInstance restoredTrap = restored.Grid.AllKnownCards.First(c => c.CardType == CardType.Trap);
+            Assert.AreEqual(4, restoredTrap.MaxHp);
+            Assert.AreEqual(1, restoredTrap.Defense);
+            Assert.AreEqual(3, restoredTrap.ContactDamageToPlayer);
+            Assert.IsTrue(restoredTrap.IsFaceUp);
+
+            // Verify player restored
+            CardInstance restoredPlayer = restored.Grid.PlayerCard;
+            Assert.AreEqual(20, restoredPlayer.MaxHp);
+            Assert.AreEqual(5, restoredPlayer.Attack);
+            Assert.AreEqual(GridCoord.FromCellIndex(8), restoredPlayer.Coord.Value);
+        }
+
+        [Test]
+        public void Hook_RelicModifiesDamageTaken()
+        {
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 0, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 5, defense: 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+
+                // Register a test relic that reduces damage taken by 2
+                TestRelicModel thornRelic = new TestRelicModel(
+                    new ModelId("test", "thorn"),
+                    modifyDamageTaken: (ctx, current) => current - 2);
+                ModelDb.Register(thornRelic);
+                context.Relics.AddPassive(thornRelic.Id);
+
+                List<DomainEvent> events = new List<DomainEvent>();
+                DamageInfo info = new DamageInfo(
+                    DamageSource.FromCard(monster.InstanceId),
+                    DamageTarget.Card(player.InstanceId),
+                    5,
+                    DamageKind.Attack,
+                    false,
+                    "Test");
+
+                DamageResult result = await context.Combat.ApplyDamageAsync(info, events);
+
+                // Base 5 damage, relic reduces by 2 => 3 actual HP loss
+                Assert.AreEqual(3, result.HpLoss);
+                Assert.AreEqual(20 - 3, player.CurrentHp);
+            });
+        }
+
+        [Test]
+        public void Hook_RelicModifiesDamageDealt()
+        {
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 0, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 0, defense: 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+
+                // Register a test relic that increases damage dealt by 3
+                TestRelicModel powerRelic = new TestRelicModel(
+                    new ModelId("test", "power"),
+                    modifyDamageDealt: (ctx, current) => current + 3);
+                ModelDb.Register(powerRelic);
+                context.Relics.AddPassive(powerRelic.Id);
+
+                List<DomainEvent> events = new List<DomainEvent>();
+                DamageInfo info = new DamageInfo(
+                    DamageSource.FromCard(player.InstanceId),
+                    DamageTarget.Card(monster.InstanceId),
+                    5,
+                    DamageKind.Attack,
+                    false,
+                    "Test");
+
+                DamageResult result = await context.Combat.ApplyDamageAsync(info, events);
+
+                // Base 5 damage, relic increases by 3 => 8 actual HP loss
+                Assert.AreEqual(8, result.HpLoss);
+                Assert.AreEqual(10 - 8, monster.CurrentHp);
+            });
+        }
+
+        private sealed class TestRelicModel : Game.Core.Domain.ContentContracts.RelicModel
+        {
+            private readonly System.Func<DamageContext, int, int> _modifyDealt;
+            private readonly System.Func<DamageContext, int, int> _modifyTaken;
+
+            public TestRelicModel(ModelId id, System.Func<DamageContext, int, int> modifyDamageDealt = null, System.Func<DamageContext, int, int> modifyDamageTaken = null)
+            {
+                Id = id;
+                _modifyDealt = modifyDamageDealt;
+                _modifyTaken = modifyDamageTaken;
+            }
+
+            public override ModelId Id { get; }
+            public override Game.Core.Domain.ContentContracts.RelicRarity Rarity => Game.Core.Domain.ContentContracts.RelicRarity.Common;
+            public override Game.Core.Domain.ContentContracts.RelicKind Kind => Game.Core.Domain.ContentContracts.RelicKind.Passive;
+
+            public override int ModifyDamageDealt(DamageContext ctx, int current)
+            {
+                return _modifyDealt != null ? _modifyDealt(ctx, current) : current;
+            }
+
+            public override int ModifyDamageTaken(DamageContext ctx, int current)
+            {
+                return _modifyTaken != null ? _modifyTaken(ctx, current) : current;
+            }
         }
 
         private static GridState NewGridWithPlayer()
@@ -279,9 +468,81 @@ namespace Game.Core.Tests
 
         private static CardInstance NewCard(uint id, CardType type, int hp = 0, int attack = 0, int defense = 0, int contactDamage = 0)
         {
-            CardInstance card = new CardInstance(new CardInstanceId(id), new ModelId("test", id.ToString()), type);
+            ModelId modelId = new ModelId("test", id.ToString());
+            CardInstance card = new CardInstance(new CardInstanceId(id), modelId, type);
             card.ConfigureCombatStats(hp, attack, defense, contactDamage, type == CardType.Monster ? 10 : 0);
+            RegisterTestModelIfNeeded(modelId, type, hp, attack, defense, contactDamage);
             return card;
+        }
+
+        private static void RegisterTestModelIfNeeded(ModelId modelId, CardType type, int hp, int attack, int defense, int contactDamage)
+        {
+            if (ModelDb.TryGet(modelId, out CardModel _))
+            {
+                return;
+            }
+
+            switch (type)
+            {
+                case CardType.Monster:
+                    ModelDb.Register(new TestMonsterModel(modelId, hp, attack, defense));
+                    break;
+                case CardType.Trap:
+                    ModelDb.Register(new TestTrapModel(modelId, hp, defense, contactDamage));
+                    break;
+                case CardType.Item:
+                    ModelDb.Register(new TestItemModel(modelId));
+                    break;
+                default:
+                    ModelDb.Register(new TestGenericModel(modelId, type));
+                    break;
+            }
+        }
+
+        private sealed class TestGenericModel : CardModel
+        {
+            private readonly CardType _type;
+            public TestGenericModel(ModelId id, CardType type) { Id = id; _type = type; }
+            public override ModelId Id { get; }
+            public override CardType CardType => _type;
+        }
+
+        private sealed class TestMonsterModel : MonsterCardModel
+        {
+            private readonly int _maxHp;
+            private readonly int _attack;
+            private readonly int _defense;
+            public TestMonsterModel(ModelId id, int maxHp, int attack, int defense) { Id = id; _maxHp = maxHp; _attack = attack; _defense = defense; }
+            public override ModelId Id { get; }
+            public override int Level => 1;
+            public override int MaxHp => _maxHp;
+            public override int Attack => _attack;
+            public override int Defense => _defense;
+        }
+
+        private sealed class TestTrapModel : TrapCardModel
+        {
+            private readonly int _maxHp;
+            private readonly int _defense;
+            private readonly int _contactDamage;
+            public TestTrapModel(ModelId id, int maxHp, int defense, int contactDamage) { Id = id; _maxHp = maxHp; _defense = defense; _contactDamage = contactDamage; }
+            public override ModelId Id { get; }
+            public override int MaxHp => _maxHp;
+            public override int Defense => _defense;
+            public override int ContactDamageToPlayer => _contactDamage;
+        }
+
+        private sealed class TestItemModel : ItemCardModel
+        {
+            public TestItemModel(ModelId id) { Id = id; }
+            public override ModelId Id { get; }
+            public override ItemTargetMode TargetMode => ItemTargetMode.None;
+            public override Task UseAsync(ItemUseContext ctx) => Task.CompletedTask;
+        }
+
+        private static void Await(System.Func<Task> asyncTest)
+        {
+            asyncTest().GetAwaiter().GetResult();
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Game.Core;
 using Game.Core.Models;
 using Game.Core.Domain.Cards;
+using Game.Core.Domain.Combat;
 using Game.Core.Domain.Inventory;
 
 namespace Game.Core.Domain.ContentContracts
@@ -56,10 +57,9 @@ namespace Game.Core.Domain.ContentContracts
             get { return Array.Empty<ModelId>(); }
         }
 
-        public override Task OnPlayerInteractAsync(CardInteractionContext ctx)
+        public override async Task OnPlayerInteractAsync(CardInteractionContext ctx)
         {
-            ctx.Domain.Combat.ResolvePlayerVsMonster(ctx.PlayerCard, ctx.TargetCard, ctx.Events);
-            return Task.CompletedTask;
+            await ctx.Domain.Combat.ResolvePlayerVsMonsterAsync(ctx.PlayerCard, ctx.TargetCard, ctx.Events).ConfigureAwait(false);
         }
 
         protected override void ConfigureCreatedInstance(CardInstance instance)
@@ -88,10 +88,9 @@ namespace Game.Core.Domain.ContentContracts
             get { return 0; }
         }
 
-        public override Task OnPlayerInteractAsync(CardInteractionContext ctx)
+        public override async Task OnPlayerInteractAsync(CardInteractionContext ctx)
         {
-            ctx.Domain.Combat.ResolvePlayerVsTrap(ctx.PlayerCard, ctx.TargetCard, ctx.Events);
-            return Task.CompletedTask;
+            await ctx.Domain.Combat.ResolvePlayerVsTrapAsync(ctx.PlayerCard, ctx.TargetCard, ctx.Events).ConfigureAwait(false);
         }
 
         protected override void ConfigureCreatedInstance(CardInstance instance)
@@ -226,6 +225,26 @@ namespace Game.Core.Domain.ContentContracts
         {
             return Task.CompletedTask;
         }
+
+        public virtual Task OnBeforeDamageAsync(DamageContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnAfterDamageAsync(DamageContext ctx, DamageResult result)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual int ModifyDamageDealt(DamageContext ctx, int current)
+        {
+            return current;
+        }
+
+        public virtual int ModifyDamageTaken(DamageContext ctx, int current)
+        {
+            return current;
+        }
     }
 
     public abstract class TraitModel : AbstractModel
@@ -243,6 +262,26 @@ namespace Game.Core.Domain.ContentContracts
         public virtual Task OnCardRemovedAsync(CardDestroyedContext ctx)
         {
             return Task.CompletedTask;
+        }
+
+        public virtual Task OnBeforeDamageAsync(DamageContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnAfterDamageAsync(DamageContext ctx, DamageResult result)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual int ModifyDamageDealt(DamageContext ctx, int current)
+        {
+            return current;
+        }
+
+        public virtual int ModifyDamageTaken(DamageContext ctx, int current)
+        {
+            return current;
         }
     }
 }

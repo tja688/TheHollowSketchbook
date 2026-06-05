@@ -37,13 +37,34 @@ namespace Game.Core.Saves
                 return;
             }
 
-            // ActionCounter and PlayerGold are restored via reflection-like Setters
-            // because the current API only exposes private setters.
-            // We bypass this by directly manipulating the fields if needed, but
-            // for now we document that the consumer must apply these after creating
-            // a new DomainActionContext with the restored Grid.
-            // NOTE: This method is a placeholder for full two-way restore.
-            // Full restore requires reconstructing GridState from dto.Grid.
+            GridState restoredGrid = RestoreGrid(dto.Grid);
+            if (restoredGrid != null)
+            {
+                domain.Grid = restoredGrid;
+            }
+
+            domain.ActionCounter.RestoreValue(dto.ActionCounterValue);
+            domain.SetPlayerGold(dto.PlayerGold);
+
+            Dictionary<uint, CardInstance> cardLookup = BuildCardLookup(domain.Grid);
+            RestoreItemInventory(dto.ItemInventory, domain.ItemInventory, cardLookup);
+            RestoreRelicInventory(dto.RelicInventory, domain.Relics);
+        }
+
+        private static Dictionary<uint, CardInstance> BuildCardLookup(GridState grid)
+        {
+            Dictionary<uint, CardInstance> lookup = new Dictionary<uint, CardInstance>();
+            if (grid == null)
+            {
+                return lookup;
+            }
+
+            foreach (CardInstance card in grid.AllKnownCards)
+            {
+                lookup[card.InstanceId.Value] = card;
+            }
+
+            return lookup;
         }
 
         public static GridStateSaveDto CaptureGrid(GridState grid)

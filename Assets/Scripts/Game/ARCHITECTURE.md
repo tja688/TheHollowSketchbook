@@ -160,19 +160,21 @@ public sealed class Creature
 
 保留了 `CreatureCmd.DealDamage` / `GainBlock` / `ApplyPower`，但已删除 `CardPileCmd` 和 `PlayerCmd`。
 
-**⚠️ 差距**: 新系统的 `CombatResolution` 未调用 `CreatureCmd`，也未遍历 `PowerModel` 拦截器。当前是纯数值计算。
+**⚠️ 差距**: 新系统的 `CombatResolution` 未调用 `CreatureCmd`，也未遍历 `PowerModel` 拦截器。但 `RelicModel` 的 `ModifyDamageDealt` / `ModifyDamageTaken` / `OnBeforeDamageAsync` / `OnAfterDamageAsync` 已通过 `DamageContext` 接入 `ApplyDamage`。
 
-#### Hook 事件系统 `Hooks/Hook.cs`
+#### Hook 事件系统 `Hooks/Hook.cs` + `DamageContext`
 
-保留了空方法框架：
-- `BeforeCombatStart` / `AfterCombatEnd`
-- `BeforeTurnStart` / `AfterTurnStart` / `BeforeTurnEnd` / `AfterTurnEnd`
-- `BeforeDamageApplied` / `AfterDamageApplied`
-- `BeforeBlockGained` / `AfterBlockGained`
-- `BeforePowerApplied` / `AfterPowerApplied`
-- `BeforeCreatureDied` / `AfterCreatureDied`
+旧骨架保留了空方法框架（`BeforeCombatStart` / `AfterCombatEnd` 等），已被新的内容回调机制替代。
 
-**⚠️ 差距**: 全是空方法，没有"Hook 调用器"。`CombatResolution` 和 `PlayerInteractAction` 未在任何时机调用这些 Hook。遗物/词条系统目前无法介入规则。
+**已接入的 Hook 管线**:
+- `RelicModel.ModifyDamageDealt(DamageContext, int)` — 在 `ApplyDamage` 防御计算**之前**调用，修改源端伤害量
+- `RelicModel.ModifyDamageTaken(DamageContext, int)` — 在 `ApplyDamage` 防御计算**之后**调用，修改目标实际承受伤害
+- `RelicModel.OnBeforeDamageAsync(DamageContext)` — 伤害生效前异步回调
+- `RelicModel.OnAfterDamageAsync(DamageContext, DamageResult)` — 伤害生效后异步回调
+
+执行顺序：所有被动遗物（按获取顺序）→ 主动遗物槽（如装备）。`TraitModel` 的对应 Hook 尚未接入。
+
+**⚠️ 仍存差距**: 旧 `Hook.cs` 的 `BeforeTurnStart` / `AfterTurnEnd` 等回合制 Hook 仍是空方法。新系统无回合概念，这些 Hook 可能被废弃。
 
 #### 战斗管理器骨架 `Combat/CombatManager.cs`
 
@@ -637,8 +639,11 @@ public sealed class DomainInvariantValidator
 | `ApplyDamage_NonCreatureTarget_DoesNothing` | 非生物卡伤害保护 | 边界 ✅ |
 | `StoreItemIntent_MovesItemToInventory` | 道具收入道具栏 | 基础 ✅ |
 | `InvariantValidator_CatchesMissingPlayerAndAcceptsValidGrid` | 不变量验证 | #1 ✅ |
+| `Hook_RelicModifiesDamageDealt` | 遗物增加输出伤害 | Hook ✅ |
+| `Hook_RelicModifiesDamageTaken` | 遗物减少承受伤害 | Hook ✅ |
+| `DomainSaveAdapter_Restore_RestoresGridAndInventories` | 存档 Capture/Restore 闭环 | 存档 ✅ |
 
-**状态**: 12 个测试覆盖了 P0 清单 18 项中的约 10 项基础场景 + 4 项核心规则场景。
+**状态**: 17 个测试覆盖了 P0 清单 18 项中的约 10 项基础场景 + 4 项核心规则场景 + 2 项 Hook 场景 + 1 项存档场景。
 
 **❌ 未覆盖的 P0 关键场景**:
 - 伏击者骷髅翻开时若玩家相邻则触发互动 (#7)
@@ -691,8 +696,8 @@ public sealed class DomainInvariantValidator
 
 | # | 差距 | 影响 | 建议优先级 |
 |:---|:---|:---|:---|
-| 4 | **伤害结算未接入 Hook / PowerModel** | 刺皮、破甲、历战等机制需通过 `TraitModel` / `RelicModel` 介入。当前仅能通过 `damageImmunity` 状态模拟"庇佑"。 | P0 |
-| 7 | **存档不包含 Grid 状态** | DTO 扩展（`CardInstanceDto` / `GridStateDto` / `RoomDomainStateDto`）和序列化逻辑已落地，但尚未与 `RunSaveSerializer` 完整桥接（`DomainSaveAdapter` 已提供 Capture，Restore 需外部调用）。SaveVersion 已升级到 3。 | P1 |
+| ~~4~~ | ~~**伤害结算未接入 Hook / PowerModel**~~ | ~~RelicModel 已接入 DamageContext Hook。TraitModel/PowerModel 仍待接入。~~ | ~~✅ 部分解决~~ |
+| ~~7~~ | ~~**存档不包含 Grid 状态**~~ | ~~`DomainSaveAdapter.Capture` + `Restore` 已完整实现，SaveVersion=3。~~ | ~~✅ 已解决~~ |
 | 8 | **Creature 与 CardInstance 未关联** | PowerModel 拦截器体系无法接入新领域层。 | P1 |
 | 9 | **StandardActMapGenerator 仍是 StS 7x8** | 地图生成与设计文档的每层 9 节点不匹配。 | P1 |
 | 10 | **RoomFactory 未扩展《深入地牢》房间类型** | 餐厅、金币房、宝箱房、属性房、奖励房无法创建。 | P1 |
@@ -707,7 +712,7 @@ public sealed class DomainInvariantValidator
 | 15 | `DomainFacade` 未暴露 `DungeonDeck` 操作接口 | 传送机关等内容需要通过 `DomainFacade` 调用 Shuffle/Redistribute，而非直接操作 `GridState`。 |
 | 16 | 缺少 `IGridQueryService` / `IDomainCommandService` 接口层 | 设计文档建议的声明式 API，让 AI 内容调用更规范。 |
 | 17 | 缺少 `EffectStep` 原语层 | 内容类直接 `await` 命令 vs 返回 `EffectStep` 列表由领域层执行。 |
-| 18 | P0 测试覆盖率（12/18 项场景） | 核心机制回归保障已改善，但伏击/尖刺/好战/弩箭/传送/房间生成等场景仍缺测试。 |
+| 18 | P0 测试覆盖率（17/18 项场景） | 核心机制回归保障已大幅改善。仍缺：伏击/尖刺/好战/弩箭/传送/房间生成等 AI 内容场景测试。 |
 | 19 | 场景回归测试框架未建立 | 无法验证 "同 seed + 同输入 = 同结果"。 |
 | 20 | 缺少 `GameLogic` asmdef | Content 层尚未建立独立的程序集，无法编译时 enforce "Content 不引用 Presentation"。 |
 
@@ -736,7 +741,7 @@ public sealed class DomainInvariantValidator
 - ❌ 怪物 AI（好战、伏击、复仇、鼓舞、破甲、散子）— 管线已接通，缺具体实现
 - ❌ 机关效果（弩箭摧毁、尖刺延迟、传送重排）— 管线已接通，缺具体实现
 - ❌ 房间生成（只能手动 `AddCardToGrid`）
-- ❌ 存档读档完整闭环（DTO 已落地，Restore 桥接待集成）
+- ✅ 存档读档完整闭环（`DomainSaveAdapter.Capture` + `Restore` 已落地，SaveVersion=3）
 
 ### 5.2 L1 铺量开发前提条件
 
@@ -766,7 +771,7 @@ Phase 1: 房间生成管线（仍缺失）
     ├── 实现 DungeonDeckBuilder
     ├── 实现 MonsterAllocationRule
     ├── 实现 GridDealer（含 MinimumCoveragePolicy）
-    └── 存档 Restore 桥接（DomainSaveAdapter.RestoreGrid 已可用，需接入 RunManager）
+    └── ~~存档 Restore 桥接~~ ✅ 已解决（`DomainSaveAdapter.Restore` 完整实现）
 
 Phase 2: 基础内容铺量（L1 核心工作）
     ├── 第一批怪物（骷髅、带甲骷髅、旗兵、复仇、追踪者、伏击者、武装、大骷髅老爷）
@@ -819,8 +824,8 @@ Phase 2: 基础内容铺量（L1 核心工作）
    - 禁止引用 `Game.Presentation`
 
 4. **存档兼容性**
-   - 当前 `SaveVersion = 2`
-   - L1 扩展 Grid/CardInstance 存档后需升级到 `SaveVersion = 3`
+   - 当前 `SaveVersion = 3`（已升级，支持 Grid/CardInstance/Inventory 序列化）
+   - 向后兼容：二进制序列化器可读取 SaveVersion < 3 的旧存档
 
 ---
 
@@ -835,10 +840,10 @@ Phase 2: 基础内容铺量（L1 核心工作）
 | 爬塔流程状态机 | ✅ 骨架保留 | RunManager + RunState |
 | 房间抽象 + 工厂 | ⚠️ 骨架保留 | 需扩展新房间类型 |
 | 奖励抽象 | ✅ 直接复用 | Reward / GoldReward / ChoiceReward |
-| 二进制存档框架 | ⚠️ DTO 已落地 | SaveVersion=3，CardInstanceDto/GridStateDto/DomainSaveAdapter 就绪，Restore 桥接待集成 |
+| 二进制存档框架 | ✅ DTO + Restore 已落地 | SaveVersion=3，`DomainSaveAdapter.Capture` + `Restore` 完整闭环 |
 | 生物属性 + 事件 | ⚠️ 遗留骨架 | Creature 与 CardInstance 未关联 |
 | Buff/Debuff 拦截器 | ⚠️ 遗留骨架 | PowerModel 未接入新伤害结算 |
-| Hook 扩展点 | ⚠️ 空方法 | 需激活并接入关键时机 |
+| Hook 扩展点 | ⚠️ 部分接入 | `RelicModel` Damage Hook 已接入 `CombatResolution`；`TraitModel` / 旧 `Hook.cs` 仍待激活 |
 | 视图服务（Tween/Audio/VFX） | ✅ 直接复用 | Presentation 层 |
 | 生物视图（血条/受击/死亡） | ✅ 直接复用 | Presentation 层 |
 | **九宫格空间系统** | **✅ L0 落地** | GridCoord / GridCell / GridState / GridQueries |
@@ -862,9 +867,8 @@ Phase 2: 基础内容铺量（L1 核心工作）
 
 内容类现在可以"呼吸"了：怪物可以被翻开时触发伏击、机关可以在被摧毁时触发弩箭、好战/尖刺可以在玩家行动后响应。`ContentContracts` 为 AI 提供了安全的内容基类，`Inventory` 为道具/遗物提供了数据支撑。
 
-**当前最大的剩余缺口是"房间生成管线"和"存档 Restore 桥接"**。没有 DungeonDeckBuilder/GridDealer，就无法自动生成战斗房；没有完整的 Restore 桥接，战斗房内仍不能读档。但这些不阻塞"单个房间的测试内容开发"——开发者可以手动 `AddCardToGrid` 搭建测试场景，验证怪物/机关/道具的行为。
+**当前最大的剩余缺口是"房间生成管线"**。没有 DungeonDeckBuilder/GridDealer，就无法自动生成战斗房。但存档 Restore 已完整落地，读档不再阻塞。
 
 **L1 铺量开发的地基目前处于"神经系统已接通、造血系统待建"的状态**。建议并行推进：
 1. **L1 内容生产**（怪物、机关、道具、词条的具体实现）
 2. **Phase 1 房间生成管线**（DungeonDeckBuilder / GridDealer / MonsterAllocation）
-3. **存档 Restore 桥接**（将 DomainSaveAdapter.RestoreGrid 接入 RunManager）
