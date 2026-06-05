@@ -61,10 +61,19 @@ namespace Game.Core.Domain
             }
             else if (intent is ChooseOptionIntent chooseOptionIntent)
             {
+                if (!_context.ChoiceSessions.TryResolve(chooseOptionIntent.SessionId, chooseOptionIntent.OptionIndex, out ChoiceSession session))
+                {
+                    DomainEventBatch rejected = new DomainEventBatch(0, chooseOptionIntent);
+                    rejected.Add(new DomainEvent(DomainEventType.IntentRejected) { Reason = "ChoiceResolveFailed" });
+                    _context.Batches.Add(rejected);
+                    return rejected;
+                }
+
                 DomainEventBatch batch = new DomainEventBatch(0, chooseOptionIntent);
                 batch.Add(new DomainEvent(DomainEventType.ChoiceResolved)
                 {
                     Amount = chooseOptionIntent.OptionIndex,
+                    SecondaryAmount = session.OptionCount,
                     Reason = chooseOptionIntent.SessionId
                 });
                 _context.Batches.Add(batch);

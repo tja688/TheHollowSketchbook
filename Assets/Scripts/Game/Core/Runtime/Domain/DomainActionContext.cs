@@ -27,6 +27,7 @@ namespace Game.Core.Domain
             RoomClearChecker = new RoomClearChecker();
             ItemInventory = new PlayerInventory();
             Relics = new RelicInventory();
+            ChoiceSessions = new ChoiceSessionStore();
         }
 
         public GridState Grid { get; internal set; }
@@ -37,6 +38,7 @@ namespace Game.Core.Domain
         public IRng Rng { get; set; }
         public PlayerInventory ItemInventory { get; }
         public RelicInventory Relics { get; }
+        public ChoiceSessionStore ChoiceSessions { get; }
         public int PlayerGold { get; private set; }
 
         public void SetPlayerGold(int value)

@@ -11,6 +11,7 @@ using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
 using Game.Core.Domain.ContentContracts;
 using Game.Core.Domain.Deck;
+using Game.Core.Domain.Inventory;
 using Game.Core.Domain.Rooms;
 using Game.Core.Domain.Validation;
 using Game.Core.Models;
@@ -312,6 +313,57 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void UseItemIntent_CarriesTargetSelectionToItemUseContext()
+        {
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 6);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                ModelId itemModelId = new ModelId("test", "targeted-item");
+                TestItemModel itemModel = new TestItemModel(itemModelId, ItemTargetMode.CardThenDirection);
+                ModelDb.Register(itemModel);
+                CardInstance item = new CardInstance(new CardInstanceId(3), itemModelId, CardType.Item);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                InventorySlot slot = context.ItemInventory.Store(item);
+                DomainFacade facade = new DomainFacade(context);
+                UseItemIntent intent = new UseItemIntent(slot, ItemTargetSelection.CardThenDirection(monster.InstanceId, GridDirection.Up));
+
+                IntentPreview preview = facade.PreviewIntent(intent);
+                DomainEventBatch batch = await facade.SubmitIntentAsync(intent);
+
+                Assert.IsTrue(preview.IsValid);
+                CollectionAssert.Contains(preview.HighlightCards, monster.InstanceId);
+                Assert.AreEqual(monster.InstanceId, itemModel.LastUseIntent.Target.PrimaryCard);
+                Assert.AreEqual(GridDirection.Up, itemModel.LastUseIntent.Target.Direction);
+                Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.ItemUsed));
+            });
+        }
+
+        [Test]
+        public void ChooseOptionIntent_RequiresOpenSessionAndResolvesOnce()
+        {
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                DomainFacade facade = new DomainFacade(context);
+
+                DomainEventBatch missingSession = await facade.SubmitIntentAsync(new ChooseOptionIntent("route", 0));
+                context.ChoiceSessions.Open("route", 2, "RouteChoice");
+                DomainEventBatch resolved = await facade.SubmitIntentAsync(new ChooseOptionIntent("route", 1));
+                DomainEventBatch duplicate = await facade.SubmitIntentAsync(new ChooseOptionIntent("route", 1));
+
+                Assert.IsTrue(missingSession.Events.Any(e => e.EventType == DomainEventType.IntentRejected && e.Reason == "ChoiceSessionNotFound"));
+                Assert.IsTrue(resolved.Events.Any(e => e.EventType == DomainEventType.ChoiceResolved && e.Reason == "route" && e.Amount == 1));
+                Assert.IsTrue(context.ChoiceSessions.TryGet("route", out ChoiceSession session));
+                Assert.IsTrue(session.IsResolved);
+                Assert.AreEqual(1, session.SelectedOptionIndex);
+                Assert.IsTrue(duplicate.Events.Any(e => e.EventType == DomainEventType.IntentRejected && e.Reason == "ChoiceAlreadyResolved"));
+            });
+        }
+
+        [Test]
         public void SaveRestore_RoundTripPreservesGridAndActionCounter()
         {
             GridState grid = NewGridWithPlayer();
@@ -608,10 +660,23 @@ namespace Game.Core.Tests
 
         private sealed class TestItemModel : ItemCardModel
         {
-            public TestItemModel(ModelId id) { Id = id; }
+            private readonly ItemTargetMode _targetMode;
+
+            public TestItemModel(ModelId id, ItemTargetMode targetMode = ItemTargetMode.None)
+            {
+                Id = id;
+                _targetMode = targetMode;
+            }
+
             public override ModelId Id { get; }
-            public override ItemTargetMode TargetMode => ItemTargetMode.None;
-            public override Task UseAsync(ItemUseContext ctx) => Task.CompletedTask;
+            public override ItemTargetMode TargetMode => _targetMode;
+            public UseItemIntent LastUseIntent { get; private set; }
+
+            public override Task UseAsync(ItemUseContext ctx)
+            {
+                LastUseIntent = (UseItemIntent)ctx.SourceIntent;
+                return Task.CompletedTask;
+            }
         }
 
         private static void Await(System.Func<Task> asyncTest)
