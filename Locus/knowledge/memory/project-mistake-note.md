@@ -11,7 +11,7 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779245302335
-updatedAt: 1779672408426
+updatedAt: 1780588467196
 ---
 
 # project-mistake-note
@@ -30,4 +30,5 @@ updatedAt: 1779672408426
 - URP `Assets/Settings/URP-HighFidelity.asset` has a project-specific serialized `m_UpscalingFilter = 4`; do not assume standard enum meaning without checking the current Unity/URP version.
 - The render scene `Assets/Tests/render.unity` now uses an active Volume profile; older notes claiming no Volume are stale.
 - `Assets/Notes` contains hand-authored tuning summaries that should be condensed into project memory rather than copied verbatim.
+- On Windows/Git Bash, avoid very long one-shot shell commands for bulk file generation; use `write`/`edit` per file or short scripts to avoid OS error 206 (file name or extension too long).
 <!-- locus:body:end -->

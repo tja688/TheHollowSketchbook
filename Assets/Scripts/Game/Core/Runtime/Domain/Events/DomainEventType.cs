@@ -1,0 +1,32 @@
+namespace Game.Core.Domain.Events
+{
+    public enum DomainEventType
+    {
+        RoomEntered,
+        RoomGenerated,
+        CardAddedToGrid,
+        CardMoved,
+        CardFlipped,
+        CardCovered,
+        CardRemoved,
+        CardZoneChanged,
+        PlayerActionCommitted,
+        DamageApplied,
+        HealingApplied,
+        GoldChanged,
+        StatChanged,
+        TraitAcquired,
+        RelicAcquired,
+        RelicActivated,
+        ItemStored,
+        ItemUsed,
+        ChoiceOpened,
+        ChoiceResolved,
+        TrapTriggered,
+        MonsterDefeated,
+        RoomCleared,
+        RouteChoicesGenerated,
+        IntentRejected,
+        RunEnded
+    }
+}
