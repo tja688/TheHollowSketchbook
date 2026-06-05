@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Game.Core.Actions;
 using Game.Core.Domain.Cards;
+using Game.Core.Domain.ContentContracts;
 using Game.Core.Domain.Events;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
@@ -19,65 +20,60 @@ namespace Game.Core.Domain.Actions
             _intent = intent;
         }
 
-        protected override Task ExecuteActionAsync(GameActionExecutionContext ctx)
+        protected override async Task ExecuteActionAsync(GameActionExecutionContext ctx)
         {
             List<DomainEvent> events = new List<DomainEvent>();
-            IntentValidationResult validation = new IntentValidator(_domain.Grid).Validate(_intent);
+            IntentValidationResult validation = new IntentValidator(_domain).Validate(_intent);
             if (!validation.IsValid)
             {
                 events.Add(new DomainEvent(DomainEventType.IntentRejected) { Reason = validation.FailureCode });
                 AddBatch(events);
-                return Task.CompletedTask;
+                return;
             }
 
             CardInstance player = _domain.Grid.PlayerCard;
             CardInstance target = _domain.Grid.GetCard(_intent.Target);
-            events.Add(_domain.ActionCounter.Increment(_intent));
-
-            switch (target.CardType)
+            CardModel model = _domain.ResolveCardModel(target);
+            CardInteractionContext interactionContext = new CardInteractionContext(_domain, player, target, _intent, events);
+            if (!model.CanInteractWithPlayer(interactionContext))
             {
-                case CardType.Monster:
-                    _domain.Combat.ResolvePlayerVsMonster(player, target, events);
-                    RemoveIfDead(target, RemoveReason.Defeated, events);
-                    RemoveIfDead(player, RemoveReason.Defeated, events);
-                    break;
-                case CardType.Trap:
-                    _domain.Combat.ResolvePlayerVsTrap(player, target, events);
-                    RemoveIfDead(target, RemoveReason.Destroyed, events);
-                    RemoveIfDead(player, RemoveReason.Defeated, events);
-                    break;
-                case CardType.Gold:
-                    _domain.GainGold(target.GoldValue, events, "GoldCard");
-                    events.AddRange(_domain.Grid.RemoveCard(target, RemoveReason.Collected).Events);
-                    break;
-                default:
-                    events.AddRange(_domain.Grid.RemoveCard(target, RemoveReason.Consumed).Events);
-                    break;
+                events.Add(new DomainEvent(DomainEventType.IntentRejected) { Reason = "InteractionRejectedByModel" });
+                AddBatch(events);
+                return;
             }
 
+            await model.OnPlayerInteractAsync(interactionContext);
+            events.Add(_domain.ActionCounter.Increment(_intent));
+            await _domain.NotifyAfterPlayerActionCommittedAsync(_intent, events);
+            RemoveIfDead(target, events);
+            RemoveIfDead(player, events);
+            await _domain.ProcessLifecycleAsync(events);
+            _domain.AppendPlayerDefeatedIfNeeded(events);
             if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))
             {
                 events.Add(new DomainEvent(DomainEventType.RoomCleared));
             }
 
             AddBatch(events);
-            return Task.CompletedTask;
         }
 
-        private void RemoveIfDead(CardInstance card, RemoveReason reason, List<DomainEvent> events)
+        private void RemoveIfDead(CardInstance card, List<DomainEvent> events)
         {
-            if (card.HasHitPoints && !card.IsAlive && card.Zone == CardZone.Grid)
+            if (card == null || !card.HasHitPoints || card.IsAlive || card.Zone != CardZone.Grid)
             {
-                events.AddRange(_domain.Grid.RemoveCard(card, reason).Events);
-                if (card.CardType == CardType.Monster)
+                return;
+            }
+
+            RemoveReason reason = card.CardType == CardType.Trap ? RemoveReason.Destroyed : RemoveReason.Defeated;
+            events.AddRange(_domain.Grid.RemoveCard(card, reason).Events);
+            if (card.CardType == CardType.Monster)
+            {
+                events.Add(new DomainEvent(DomainEventType.MonsterDefeated)
                 {
-                    events.Add(new DomainEvent(DomainEventType.MonsterDefeated)
-                    {
-                        CardId = card.InstanceId,
-                        Reason = reason.ToString()
-                    });
-                    _domain.GainGold(card.GoldOnRemoved, events, "MonsterRemoved");
-                }
+                    CardId = card.InstanceId,
+                    Reason = reason.ToString()
+                });
+                _domain.GainGold(card.GoldOnRemoved, events, "MonsterRemoved");
             }
         }
 

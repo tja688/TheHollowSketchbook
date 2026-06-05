@@ -19,7 +19,7 @@ namespace Game.Core.Domain.Actions
             _intent = intent;
         }
 
-        protected override Task ExecuteActionAsync(GameActionExecutionContext ctx)
+        protected override async Task ExecuteActionAsync(GameActionExecutionContext ctx)
         {
             List<DomainEvent> events = new List<DomainEvent>();
             CardInstance player = _domain.Grid.PlayerCard;
@@ -32,14 +32,20 @@ namespace Game.Core.Domain.Actions
             {
                 events.AddRange(move.Events);
                 events.Add(_domain.ActionCounter.Increment(_intent));
+                await _domain.NotifyAfterPlayerActionCommittedAsync(_intent, events);
                 GridOperationResult reveal = _domain.Grid.RevealAround(_intent.To, FlipReason.PlayerAdjacentReveal);
                 events.AddRange(reveal.Events);
+                await _domain.ProcessLifecycleAsync(events);
+                _domain.AppendPlayerDefeatedIfNeeded(events);
+                if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))
+                {
+                    events.Add(new DomainEvent(DomainEventType.RoomCleared));
+                }
             }
 
             DomainEventBatch batch = new DomainEventBatch(Id, _intent);
             batch.AddRange(events);
             _domain.Batches.Add(batch);
-            return Task.CompletedTask;
         }
     }
 }

@@ -30,25 +30,36 @@ namespace Game.Core.Saves
                 "prototype-current-run.dat");
         }
 
-        public void SaveCurrentRun(Runs.RunState run)
+        public void SaveCurrentRun(Runs.RunState run, Domain.DomainActionContext domain = null)
         {
             if (run == null)
             {
                 throw new ArgumentNullException(nameof(run));
             }
 
-            _cachedRun = RunSaveSerializer.Capture(run);
+            _cachedRun = RunSaveSerializer.Capture(run, domain);
             PersistToDisk(_cachedRun);
         }
 
-        public Runs.RunState TryLoadCurrentRun()
+        public Runs.RunState TryLoadCurrentRun(out RoomDomainStateSaveDto roomDomainState)
         {
             if (_cachedRun == null)
             {
                 _cachedRun = LoadFromDisk();
             }
 
-            return _cachedRun == null ? null : RunSaveSerializer.Restore(_cachedRun);
+            if (_cachedRun == null)
+            {
+                roomDomainState = null;
+                return null;
+            }
+
+            return RunSaveSerializer.Restore(_cachedRun, out roomDomainState);
+        }
+
+        public Runs.RunState TryLoadCurrentRun()
+        {
+            return TryLoadCurrentRun(out _);
         }
 
         public RunSaveDto ExportCurrentRun()
@@ -115,6 +126,7 @@ namespace Game.Core.Saves
             WriteNullable(writer, dto.CurrentMapCoord, WriteMapCoord);
             WriteNullable(writer, dto.Map, WriteMap);
             WriteNullable(writer, dto.CurrentRoom, WriteRoom);
+            WriteNullable(writer, dto.RoomDomainState, WriteRoomDomainState);
             WriteList(writer, dto.Players, WritePlayer);
             WriteList(writer, dto.ActIds, WriteActId);
         }
@@ -132,6 +144,11 @@ namespace Game.Core.Saves
                 Map = ReadNullable(reader, ReadMap),
                 CurrentRoom = ReadNullable(reader, ReadRoom)
             };
+
+            if (dto.SaveVersion >= 3)
+            {
+                dto.RoomDomainState = ReadNullable(reader, ReadRoomDomainState);
+            }
 
             dto.Players = ReadList(reader, ReadPlayer);
             if (reader.BaseStream.Position < reader.BaseStream.Length)
@@ -325,15 +342,174 @@ namespace Game.Core.Saves
 
             return list;
         }
+
+        // --- RoomDomainState serialization ---
+
+        private static void WriteRoomDomainState(BinaryWriter writer, RoomDomainStateSaveDto dto)
+        {
+            writer.Write(dto.ActionCounterValue);
+            writer.Write(dto.PlayerGold);
+            WriteNullable(writer, dto.Grid, WriteGridState);
+            WriteNullable(writer, dto.ItemInventory, WritePlayerInventory);
+            WriteNullable(writer, dto.RelicInventory, WriteRelicInventory);
+        }
+
+        private static RoomDomainStateSaveDto ReadRoomDomainState(BinaryReader reader)
+        {
+            return new RoomDomainStateSaveDto
+            {
+                ActionCounterValue = reader.ReadInt32(),
+                PlayerGold = reader.ReadInt32(),
+                Grid = ReadNullable(reader, ReadGridState),
+                ItemInventory = ReadNullable(reader, ReadPlayerInventory),
+                RelicInventory = ReadNullable(reader, ReadRelicInventory)
+            };
+        }
+
+        private static void WriteGridState(BinaryWriter writer, GridStateSaveDto dto)
+        {
+            WriteList(writer, dto.Cells, WriteGridCell);
+            WriteList(writer, dto.Cards, WriteCardInstance);
+        }
+
+        private static GridStateSaveDto ReadGridState(BinaryReader reader)
+        {
+            return new GridStateSaveDto
+            {
+                Cells = ReadList(reader, ReadGridCell),
+                Cards = ReadList(reader, ReadCardInstance)
+            };
+        }
+
+        private static void WriteGridCell(BinaryWriter writer, GridCellSaveDto dto)
+        {
+            writer.Write(dto.CoordRow);
+            writer.Write(dto.CoordCol);
+            WriteList(writer, dto.CardInstanceIds, (w, id) => w.Write(id));
+        }
+
+        private static GridCellSaveDto ReadGridCell(BinaryReader reader)
+        {
+            return new GridCellSaveDto
+            {
+                CoordRow = reader.ReadInt32(),
+                CoordCol = reader.ReadInt32(),
+                CardInstanceIds = ReadList(reader, r => r.ReadUInt32())
+            };
+        }
+
+        private static void WriteCardInstance(BinaryWriter writer, CardInstanceSaveDto dto)
+        {
+            writer.Write(dto.InstanceId);
+            writer.Write(dto.ModelCategory ?? string.Empty);
+            writer.Write(dto.ModelEntry ?? string.Empty);
+            writer.Write(dto.CardType);
+            writer.Write(dto.Zone);
+            writer.Write(dto.CoordRow.HasValue);
+            if (dto.CoordRow.HasValue)
+            {
+                writer.Write(dto.CoordRow.Value);
+                writer.Write(dto.CoordCol.Value);
+            }
+            writer.Write(dto.StackIndex);
+            writer.Write(dto.IsFaceUp);
+            writer.Write(dto.IsRemoved);
+            writer.Write(dto.MaxHp);
+            writer.Write(dto.CurrentHp);
+            writer.Write(dto.Attack);
+            writer.Write(dto.Defense);
+            writer.Write(dto.ContactDamageToPlayer);
+            writer.Write(dto.GoldOnRemoved);
+            writer.Write(dto.GoldValue);
+            WriteList(writer, dto.RuntimeState, WriteRuntimeStateEntry);
+        }
+
+        private static CardInstanceSaveDto ReadCardInstance(BinaryReader reader)
+        {
+            CardInstanceSaveDto dto = new CardInstanceSaveDto
+            {
+                InstanceId = reader.ReadUInt32(),
+                ModelCategory = reader.ReadString(),
+                ModelEntry = reader.ReadString(),
+                CardType = reader.ReadInt32(),
+                Zone = reader.ReadInt32(),
+                CoordRow = null,
+                CoordCol = null
+            };
+            if (reader.ReadBoolean())
+            {
+                dto.CoordRow = reader.ReadInt32();
+                dto.CoordCol = reader.ReadInt32();
+            }
+            dto.StackIndex = reader.ReadInt32();
+            dto.IsFaceUp = reader.ReadBoolean();
+            dto.IsRemoved = reader.ReadBoolean();
+            dto.MaxHp = reader.ReadInt32();
+            dto.CurrentHp = reader.ReadInt32();
+            dto.Attack = reader.ReadInt32();
+            dto.Defense = reader.ReadInt32();
+            dto.ContactDamageToPlayer = reader.ReadInt32();
+            dto.GoldOnRemoved = reader.ReadInt32();
+            dto.GoldValue = reader.ReadInt32();
+            dto.RuntimeState = ReadList(reader, ReadRuntimeStateEntry);
+            return dto;
+        }
+
+        private static void WriteRuntimeStateEntry(BinaryWriter writer, RuntimeStateEntry dto)
+        {
+            writer.Write(dto.Key ?? string.Empty);
+            writer.Write(dto.Value);
+        }
+
+        private static RuntimeStateEntry ReadRuntimeStateEntry(BinaryReader reader)
+        {
+            return new RuntimeStateEntry
+            {
+                Key = reader.ReadString(),
+                Value = reader.ReadInt32()
+            };
+        }
+
+        private static void WritePlayerInventory(BinaryWriter writer, PlayerInventorySaveDto dto)
+        {
+            WriteList(writer, dto.ItemInstanceIds, (w, id) => w.Write(id));
+        }
+
+        private static PlayerInventorySaveDto ReadPlayerInventory(BinaryReader reader)
+        {
+            return new PlayerInventorySaveDto
+            {
+                ItemInstanceIds = ReadList(reader, r => r.ReadUInt32())
+            };
+        }
+
+        private static void WriteRelicInventory(BinaryWriter writer, RelicInventorySaveDto dto)
+        {
+            WriteList(writer, dto.PassiveRelics, WriteActId);
+            WriteNullable(writer, dto.ActiveRelic, WriteActId);
+            writer.Write(dto.ActiveRelicMaxUses);
+            writer.Write(dto.ActiveRelicUsesRemaining);
+        }
+
+        private static RelicInventorySaveDto ReadRelicInventory(BinaryReader reader)
+        {
+            return new RelicInventorySaveDto
+            {
+                PassiveRelics = ReadList(reader, ReadActId),
+                ActiveRelic = ReadNullable(reader, ReadActId),
+                ActiveRelicMaxUses = reader.ReadInt32(),
+                ActiveRelicUsesRemaining = reader.ReadInt32()
+            };
+        }
     }
 
     public static class RunSaveSerializer
     {
-        public static RunSaveDto Capture(Runs.RunState run)
+        public static RunSaveDto Capture(Runs.RunState run, Domain.DomainActionContext domain = null)
         {
             RunSaveDto dto = new RunSaveDto
             {
-                SaveVersion = 2, // Bumped to 2 after removing deck/energy/card serialization
+                SaveVersion = 3, // Bumped to 3 after adding RoomDomainState serialization
                 Seed = run.Seed,
                 CurrentActIndex = run.CurrentActIndex,
                 IsGameOver = run.IsGameOver,
@@ -342,6 +518,11 @@ namespace Game.Core.Saves
                 CurrentRoom = run.CurrentRoom != null ? CaptureRoom(run.CurrentRoom) : null,
                 Map = run.Map != null ? CaptureMap(run.Map) : null
             };
+
+            if (domain != null)
+            {
+                dto.RoomDomainState = DomainSaveAdapter.Capture(domain);
+            }
 
             for (int i = 0; i < run.Players.Count; i++)
             {
@@ -356,8 +537,9 @@ namespace Game.Core.Saves
             return dto;
         }
 
-        public static Runs.RunState Restore(RunSaveDto dto)
+        public static Runs.RunState Restore(RunSaveDto dto, out RoomDomainStateSaveDto roomDomainState)
         {
+            roomDomainState = dto?.RoomDomainState;
             if (dto == null)
             {
                 return null;
@@ -399,6 +581,11 @@ namespace Game.Core.Saves
             }
 
             return run;
+        }
+
+        public static Runs.RunState Restore(RunSaveDto dto)
+        {
+            return Restore(dto, out _);
         }
 
         private static PlayerSaveDto CapturePlayer(Player player)
@@ -566,5 +753,6 @@ namespace Game.Core.Saves
             reward.SetResolvedState(dto.IsResolved);
             return reward;
         }
+
     }
 }

@@ -17,6 +17,7 @@ namespace Game.Core.Saves
         public MapCoordSaveDto CurrentMapCoord;
         public MapSaveDto Map;
         public RoomSaveDto CurrentRoom;
+        public RoomDomainStateSaveDto RoomDomainState;
         public List<PlayerSaveDto> Players = new List<PlayerSaveDto>();
         public List<ActIdSaveDto> ActIds = new List<ActIdSaveDto>();
     }

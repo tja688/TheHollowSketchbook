@@ -82,5 +82,6 @@ namespace Game.Core.Domain.Combat
         public int DefenseReducedAmount { get; set; }
         public int HpLoss { get; set; }
         public bool Killed { get; set; }
+        public bool Prevented { get; set; }
     }
 }

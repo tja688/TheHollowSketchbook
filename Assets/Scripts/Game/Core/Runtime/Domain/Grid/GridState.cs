@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Game.Core.Domain.Cards;
 using Game.Core.Domain.Deck;
 using Game.Core.Domain.Events;
+using Game.Core.Domain.Inventory;
 using Game.Core.Random;
 
 namespace Game.Core.Domain.Grid
@@ -416,6 +417,56 @@ namespace Game.Core.Domain.Grid
                         Reason = reason.ToString()
                     });
                 }
+            }
+
+            return GridOperationResult.Success(events);
+        }
+
+        public GridOperationResult MoveTopCardToZone(CardInstance card, CardZone zone, string reason)
+        {
+            if (card == null)
+            {
+                throw new ArgumentNullException(nameof(card));
+            }
+
+            if (card.Zone != CardZone.Grid || !card.Coord.HasValue)
+            {
+                return GridOperationResult.Failure("CardNotOnGrid");
+            }
+
+            GridCoord from = card.Coord.Value;
+            GridCell cell = GetCell(from);
+            if (cell.TopCard != card)
+            {
+                return GridOperationResult.Failure("OnlyTopCardCanMove");
+            }
+
+            cell.PopTop();
+            card.Zone = zone;
+            card.Coord = null;
+            card.StackIndex = -1;
+            card.IsRemoved = false;
+            card.IsFaceUp = true;
+            List<DomainEvent> events = new List<DomainEvent>
+            {
+                new DomainEvent(DomainEventType.CardZoneChanged)
+                {
+                    CardId = card.InstanceId,
+                    FromCoord = from,
+                    Reason = reason ?? zone.ToString()
+                }
+            };
+
+            CardInstance newTop = cell.TopCard;
+            if (newTop != null && !newTop.IsFaceUp)
+            {
+                newTop.IsFaceUp = true;
+                events.Add(new DomainEvent(DomainEventType.CardFlipped)
+                {
+                    CardId = newTop.InstanceId,
+                    ToCoord = from,
+                    Reason = FlipReason.RevealAfterTopRemoved.ToString()
+                });
             }
 
             return GridOperationResult.Success(events);

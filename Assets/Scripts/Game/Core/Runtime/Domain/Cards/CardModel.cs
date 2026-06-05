@@ -1,3 +1,5 @@
+using System.Threading.Tasks;
+using Game.Core.Domain.ContentContracts;
 using Game.Core.Models;
 
 namespace Game.Core.Domain.Cards
@@ -29,6 +31,31 @@ namespace Game.Core.Domain.Cards
         public virtual bool BlocksAutoReveal
         {
             get { return false; }
+        }
+
+        public virtual bool CanInteractWithPlayer(CardInteractionContext ctx)
+        {
+            return CardType != CardType.Player;
+        }
+
+        public virtual Task OnPlayerInteractAsync(CardInteractionContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnRevealedAsync(CardRevealContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnDestroyedAsync(CardDestroyedContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnAfterPlayerActionCommittedAsync(PlayerActionContext ctx)
+        {
+            return Task.CompletedTask;
         }
 
         public virtual CardInstance CreateInstance(CardInstanceId id)

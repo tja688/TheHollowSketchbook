@@ -22,16 +22,42 @@ namespace Game.Core.Domain.Combat
                 throw new InvalidOperationException("Damage target does not exist: " + info.Target.CardId);
             }
 
+            if (!target.HasHitPoints)
+            {
+                return new DamageResult
+                {
+                    TargetCardId = target.InstanceId,
+                    OriginalAmount = info.BaseAmount,
+                    DefenseReducedAmount = 0,
+                    HpLoss = 0,
+                    Killed = false
+                };
+            }
+
             int amount = info.BaseAmount;
             int reduced = info.IgnoreDefense ? amount : Math.Max(0, amount - target.Defense);
-            int hpLoss = target.ApplyHpLoss(reduced);
+            int hpLoss;
+            bool prevented = false;
+
+            if (info.CanBePrevented && target.GetState("damageImmunity", 0) > 0)
+            {
+                target.SetState("damageImmunity", target.GetState("damageImmunity") - 1);
+                hpLoss = 0;
+                prevented = true;
+            }
+            else
+            {
+                hpLoss = target.ApplyHpLoss(reduced);
+            }
+
             DamageResult result = new DamageResult
             {
                 TargetCardId = target.InstanceId,
                 OriginalAmount = amount,
                 DefenseReducedAmount = reduced,
                 HpLoss = hpLoss,
-                Killed = target.HasHitPoints && !target.IsAlive
+                Killed = target.HasHitPoints && !target.IsAlive,
+                Prevented = prevented
             };
 
             events?.Add(new DomainEvent(DomainEventType.DamageApplied)
@@ -40,7 +66,7 @@ namespace Game.Core.Domain.Combat
                 TargetCardId = target.InstanceId,
                 Amount = hpLoss,
                 SecondaryAmount = reduced,
-                Reason = info.Reason
+                Reason = info.Reason + (prevented ? ":Prevented" : string.Empty)
             });
 
             return result;
@@ -48,16 +74,64 @@ namespace Game.Core.Domain.Combat
 
         public void ResolvePlayerVsMonster(CardInstance player, CardInstance monster, ICollection<DomainEvent> events)
         {
-            DamageResult playerHit = ApplyDamage(new DamageInfo(
-                DamageSource.FromCard(player.InstanceId),
-                DamageTarget.Card(monster.InstanceId),
-                player.Attack,
-                DamageKind.Attack,
-                false,
-                "PlayerAttackMonster"), events);
+            bool playerFirst = HasFirstStrike(player);
+            bool monsterFirst = HasFirstStrike(monster);
 
-            if (!playerHit.Killed)
+            if (playerFirst && !monsterFirst)
             {
+                // 玩家先攻
+                DamageResult playerHit = ApplyDamage(new DamageInfo(
+                    DamageSource.FromCard(player.InstanceId),
+                    DamageTarget.Card(monster.InstanceId),
+                    player.Attack,
+                    DamageKind.Attack,
+                    false,
+                    "PlayerAttackMonster"), events);
+
+                if (!playerHit.Killed)
+                {
+                    ApplyDamage(new DamageInfo(
+                        DamageSource.FromCard(monster.InstanceId),
+                        DamageTarget.Card(player.InstanceId),
+                        monster.Attack,
+                        DamageKind.Attack,
+                        false,
+                        "MonsterCounterAttack"), events);
+                }
+            }
+            else if (monsterFirst && !playerFirst)
+            {
+                // 怪物先攻
+                DamageResult monsterHit = ApplyDamage(new DamageInfo(
+                    DamageSource.FromCard(monster.InstanceId),
+                    DamageTarget.Card(player.InstanceId),
+                    monster.Attack,
+                    DamageKind.Attack,
+                    false,
+                    "MonsterAttackPlayer"), events);
+
+                if (!monsterHit.Killed)
+                {
+                    ApplyDamage(new DamageInfo(
+                        DamageSource.FromCard(player.InstanceId),
+                        DamageTarget.Card(monster.InstanceId),
+                        player.Attack,
+                        DamageKind.Attack,
+                        false,
+                        "PlayerCounterAttack"), events);
+                }
+            }
+            else
+            {
+                // 双方同时先攻（都有先攻）或都不先攻时，按设计文档同时受到伤害
+                ApplyDamage(new DamageInfo(
+                    DamageSource.FromCard(player.InstanceId),
+                    DamageTarget.Card(monster.InstanceId),
+                    player.Attack,
+                    DamageKind.Attack,
+                    false,
+                    "PlayerAttackMonster"), events);
+
                 ApplyDamage(new DamageInfo(
                     DamageSource.FromCard(monster.InstanceId),
                     DamageTarget.Card(player.InstanceId),
@@ -88,6 +162,11 @@ namespace Game.Core.Domain.Combat
                     true,
                     "TrapContactDamage"), events);
             }
+        }
+
+        private static bool HasFirstStrike(CardInstance card)
+        {
+            return card.GetState("firstStrike", 0) > 0;
         }
     }
 }

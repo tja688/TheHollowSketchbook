@@ -2,9 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Game.Core.Actions;
 using Game.Core.Domain.Actions;
-using Game.Core.Domain.Combat;
 using Game.Core.Domain.Events;
-using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
 
 namespace Game.Core.Domain
@@ -20,7 +18,7 @@ namespace Game.Core.Domain
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _executor = new ActionExecutor(_queue);
-            _validator = new IntentValidator(context.Grid);
+            _validator = new IntentValidator(context);
         }
 
         public DomainActionContext Context
@@ -52,6 +50,29 @@ namespace Game.Core.Domain
             else if (intent is InteractWithCardIntent interactIntent)
             {
                 _queue.Enqueue(new PlayerInteractAction(_context, interactIntent));
+            }
+            else if (intent is StoreItemIntent storeItemIntent)
+            {
+                _queue.Enqueue(new StoreItemAction(_context, storeItemIntent));
+            }
+            else if (intent is UseItemIntent useItemIntent)
+            {
+                _queue.Enqueue(new UseItemAction(_context, useItemIntent));
+            }
+            else if (intent is ChooseOptionIntent chooseOptionIntent)
+            {
+                DomainEventBatch batch = new DomainEventBatch(0, chooseOptionIntent);
+                batch.Add(new DomainEvent(DomainEventType.ChoiceResolved)
+                {
+                    Amount = chooseOptionIntent.OptionIndex,
+                    Reason = chooseOptionIntent.SessionId
+                });
+                _context.Batches.Add(batch);
+                return batch;
+            }
+            else if (intent is ActivateRelicIntent activateRelicIntent)
+            {
+                _queue.Enqueue(new ActivateRelicAction(_context, activateRelicIntent));
             }
             else
             {

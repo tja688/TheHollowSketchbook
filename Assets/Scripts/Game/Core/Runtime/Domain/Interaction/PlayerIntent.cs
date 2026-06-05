@@ -1,5 +1,7 @@
+using Game.Core;
 using Game.Core.Domain.Cards;
 using Game.Core.Domain.Grid;
+using Game.Core.Domain.Inventory;
 
 namespace Game.Core.Domain.Interaction
 {
@@ -44,5 +46,51 @@ namespace Game.Core.Domain.Interaction
         }
 
         public CardInstanceId Target { get; }
+    }
+
+    public sealed class StoreItemIntent : PlayerIntent
+    {
+        public StoreItemIntent(CardInstanceId itemCard)
+            : base(IntentKind.StoreItem)
+        {
+            ItemCard = itemCard;
+        }
+
+        public CardInstanceId ItemCard { get; }
+    }
+
+    public sealed class UseItemIntent : PlayerIntent
+    {
+        public UseItemIntent(InventorySlot slot)
+            : base(IntentKind.UseItem)
+        {
+            Slot = slot;
+        }
+
+        public InventorySlot Slot { get; }
+    }
+
+    public sealed class ChooseOptionIntent : PlayerIntent
+    {
+        public ChooseOptionIntent(string sessionId, int optionIndex)
+            : base(IntentKind.ChooseOption)
+        {
+            SessionId = sessionId ?? string.Empty;
+            OptionIndex = optionIndex;
+        }
+
+        public string SessionId { get; }
+        public int OptionIndex { get; }
+    }
+
+    public sealed class ActivateRelicIntent : PlayerIntent
+    {
+        public ActivateRelicIntent(ModelId relicId)
+            : base(IntentKind.ActivateRelic)
+        {
+            RelicId = relicId;
+        }
+
+        public ModelId RelicId { get; }
     }
 }
