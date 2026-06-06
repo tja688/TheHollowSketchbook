@@ -154,11 +154,6 @@ namespace Game.Core.Domain.ContentContracts
             get { return 1; }
         }
 
-        public virtual bool CountsAsPlayerAction
-        {
-            get { return false; }
-        }
-
         public virtual bool CanUse(ItemUseContext ctx)
         {
             return true;

@@ -1,6 +1,6 @@
 # Assets/Scripts/Game Architecture
 
-> Last updated: 2026-06-05  
+> Last updated: 2026-06-06  
 > Scope: current as-built L0 foundation and project-level domain infrastructure under `Assets/Scripts/Game`.
 
 ## Current Verdict
@@ -26,7 +26,7 @@ The project uses four practical layers.
 
 `Game.Core.Tests.asmdef` references only `Game.Core` and also has no engine references. The core test suite is therefore fast and deterministic enough for regression coverage of domain rules.
 
-`Game.Presentation.asmdef` exists for Unity-facing code. A dedicated `Game.Content.asmdef` is still not present under `Assets/Scripts/Game/Content`; adding it remains a recommended next hardening step before broad L1 content work.
+`Game.Presentation.asmdef` exists for Unity-facing code. `Game.Content.asmdef` has been added under `Assets/Scripts/Game/Content`; it references only `Game.Core` and has `noEngineReferences: true`, enforcing the rule that content layer code depends solely on the pure C# core domain and never on Unity APIs.
 
 ## Runtime Entry Point
 
@@ -52,7 +52,7 @@ Supported intents are defined in `PlayerIntent.cs`:
 | `MovePlayerIntent` | Move player card to an empty grid cell. | Yes |
 | `InteractWithCardIntent` | Interact with a face-up top card on the grid. | Yes |
 | `StoreItemIntent` | Move a face-up top item card from grid to inventory. | No |
-| `UseItemIntent` | Use an inventory item with optional target selection. | Only when `ItemCardModel.CountsAsPlayerAction` is true |
+| `UseItemIntent` | Use an inventory item with optional target selection. | No (item use never counts as a player action per latest design) |
 | `ChooseOptionIntent` | Resolve an open choice session exactly once. | No |
 | `ActivateRelicIntent` | Activate equipped active relic. | No |
 
@@ -126,10 +126,11 @@ Observer snapshots prevent cards flipped during the current action from retroact
 
 1. Emits `ItemUsed`.
 2. Executes `ItemCardModel.UseAsync()`.
-3. If `CountsAsPlayerAction` is true, increments the player action counter and notifies after-action observers.
-4. Decrements `usesRemaining`.
-5. If depleted, removes the card from inventory, tracks it in the domain card lookup, marks it removed, emits `CardZoneChanged(Removed)`, and emits `CardRemoved(Consumed)`.
-6. Processes lifecycle callbacks and terminal checks.
+3. Decrements `usesRemaining`.
+4. If depleted, removes the card from inventory, tracks it in the domain card lookup, marks it removed, emits `CardZoneChanged(Removed)`, and emits `CardRemoved(Consumed)`.
+5. Processes lifecycle callbacks and terminal checks.
+
+Item use does **not** count as a player action and does **not** increment the player action counter, per the latest design rule that all item-related behavior is excluded from player action counting.
 
 `RelicInventory` supports passive relic IDs and one active relic slot. Damage hooks and active relic activation are routed through `DomainActionContext` and content contract methods on `RelicModel`.
 
@@ -143,7 +144,7 @@ Supported baseline behavior includes:
 |---|---|
 | Player vs monster | Uses attack, defense, counterattack, death removal, gold reward. |
 | Player vs trap | Trap contact damage ignores player defense. |
-| First strike | One or both sides can attack first through runtime state. |
+| First strike | One or both sides can attack first through runtime state. When only one side has first strike, that side attacks first. When both or neither have first strike, the player attacks first. In all cases the defender counter-attacks only if the attacker's blow did not kill it. |
 | Damage prevention | Runtime `damageImmunity` can prevent damage. |
 | Relic hooks | Before/after damage and damage dealt/taken modifiers. |
 | Trait damage hooks | Source, target, and field observer trait modifiers are invoked. |
@@ -212,7 +213,7 @@ This validator is a safety net, not a replacement for using domain APIs.
 
 ## Testing Status
 
-The current core regression suite is `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs` with 33 `[Test]` cases.
+The current core regression suite is `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs` with 34 `[Test]` cases.
 
 Covered areas include:
 
@@ -220,9 +221,9 @@ Covered areas include:
 |---|---|
 | Grid basics | Coordinates, stacks, top-card behavior, reveal after removal. |
 | Movement and interaction | Player movement, invalid interactions, monster defeat, room clear. |
-| Combat | Defense, traps, first strike, simultaneous death, prevention, player defeat. |
+| Combat | Defense, traps, first strike (player-only, monster-only, both, neither), kill-prevents-counterattack, prevention, player defeat. |
 | Collections and invariants | Read-only views, cross-zone duplicate detection. |
-| Inventory and item use | Store item, target selection, lifecycle consumption events, countable item action commit. |
+| Inventory and item use | Store item, target selection, lifecycle consumption events, item use does not count as player action. |
 | Choice sessions | Missing session, valid resolution, duplicate rejection. |
 | Save/restore | Grid, combat reference replacement, deck, inventory, choices, progression, RNG. |
 | Hooks | Relic damage modifiers, trait flip/action/remove lifecycle. |
@@ -253,7 +254,7 @@ These are known and should not be described as complete:
 
 | Gap | Impact | Suggested Priority |
 |---|---|---|
-| No `Game.Content.asmdef` under `Assets/Scripts/Game/Content` | Content layer is not yet compile-time constrained to Core-only references. | High before broad L1. |
+| No `Game.Content.asmdef` under `Assets/Scripts/Game/Content` | **Resolved.** `Game.Content.asmdef` now exists, references only `Game.Core`, and has `noEngineReferences: true`. | Done |
 | No full player stat layer such as `PlayerRunState` / `StatModifier` | Permanent growth, room temporary buffs, relic stat modifiers, and character identity may tempt direct stat mutation. | High for relic/character work. |
 | No first-class pending trigger queue | Delayed effects can be represented through runtime state and lifecycle hooks, but not yet as saveable scheduled trigger objects. | Medium-high for complex traps. |
 | No formal domain command/query service facade for content authors | Content can still see rich domain objects; conventions rely on review and tests. | Medium. |
@@ -274,6 +275,6 @@ L0-P0 infrastructure is usable for the next phase if development proceeds with g
 | Basic combat and damage hooks | Ready for simple-to-moderate L1 content. |
 | Room/deck/deal P0 pipeline | Ready for prototype room generation. |
 | Save/restore for current runtime state | Ready for current modeled state. |
-| Broad content production | Conditionally ready after adding `Game.Content.asmdef` and agreeing on player stat/trigger scope. |
+| Broad content production | Conditionally ready after adding player stat/trigger scope. `Game.Content.asmdef` is in place. |
 
 The practical recommendation is to start L1 with a small vertical slice of content that uses the existing contracts, while immediately adding missing compile-time content boundaries and player stat infrastructure before implementing relic-heavy or delayed-trigger-heavy systems.

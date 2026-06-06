@@ -148,7 +148,9 @@ namespace Game.Core.Domain.Combat
             }
             else
             {
-                await ApplyDamageAsync(new DamageInfo(
+                // Both have first strike or neither has it:
+                // player attacks first; monster counter-attacks only if it survives.
+                DamageResult playerHit = await ApplyDamageAsync(new DamageInfo(
                     DamageSource.FromCard(player.InstanceId),
                     DamageTarget.Card(monster.InstanceId),
                     player.Attack,
@@ -156,13 +158,16 @@ namespace Game.Core.Domain.Combat
                     false,
                     "PlayerAttackMonster"), events).ConfigureAwait(false);
 
-                await ApplyDamageAsync(new DamageInfo(
-                    DamageSource.FromCard(monster.InstanceId),
-                    DamageTarget.Card(player.InstanceId),
-                    monster.Attack,
-                    DamageKind.Attack,
-                    false,
-                    "MonsterCounterAttack"), events).ConfigureAwait(false);
+                if (!playerHit.Killed)
+                {
+                    await ApplyDamageAsync(new DamageInfo(
+                        DamageSource.FromCard(monster.InstanceId),
+                        DamageTarget.Card(player.InstanceId),
+                        monster.Attack,
+                        DamageKind.Attack,
+                        false,
+                        "MonsterCounterAttack"), events).ConfigureAwait(false);
+                }
             }
         }
 

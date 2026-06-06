@@ -224,7 +224,7 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void CombatResolution_SimultaneousDeath_BothDie()
+        public void CombatResolution_BothFirstStrike_PlayerAttacksFirstMonsterDies()
         {
             Await(async () =>
             {
@@ -232,7 +232,7 @@ namespace Game.Core.Tests
                 CardInstance player = grid.PlayerCard;
                 player.ConfigureCombatStats(5, 5, 0, 0, 0);
                 CardInstance monster = NewCard(2, CardType.Monster, hp: 5, attack: 5, defense: 0);
-                // Both have first strike => simultaneous attack
+                // Both have first strike => player still attacks first per latest design
                 player.SetState("firstStrike", 1);
                 monster.SetState("firstStrike", 1);
                 grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
@@ -241,9 +241,32 @@ namespace Game.Core.Tests
 
                 await context.Combat.ResolvePlayerVsMonsterAsync(player, monster, events);
 
-                // Both should die because damage is applied simultaneously
-                Assert.AreEqual(0, player.CurrentHp);
+                // Player attacks first and kills monster; monster does NOT counter-attack
                 Assert.AreEqual(0, monster.CurrentHp);
+                Assert.AreEqual(5, player.CurrentHp);
+                Assert.IsTrue(events.Any(e => e.EventType == DomainEventType.DamageApplied && e.Reason.Contains("PlayerAttackMonster")));
+                Assert.IsFalse(events.Any(e => e.EventType == DomainEventType.DamageApplied && e.Reason.Contains("MonsterCounterAttack")));
+            });
+        }
+
+        [Test]
+        public void CombatResolution_NeitherFirstStrike_PlayerAttacksFirstMonsterSurvives()
+        {
+            Await(async () =>
+            {
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 0, 0, 0);
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 3, defense: 0);
+                // Neither has first strike => player attacks first, monster survives and counter-attacks
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                List<DomainEvent> events = new List<DomainEvent>();
+
+                await context.Combat.ResolvePlayerVsMonsterAsync(player, monster, events);
+
+                Assert.AreEqual(5, monster.CurrentHp); // 10 - 5 = 5
+                Assert.AreEqual(17, player.CurrentHp); // 20 - 3 = 17
                 Assert.IsTrue(events.Any(e => e.EventType == DomainEventType.DamageApplied && e.Reason.Contains("PlayerAttackMonster")));
                 Assert.IsTrue(events.Any(e => e.EventType == DomainEventType.DamageApplied && e.Reason.Contains("MonsterCounterAttack")));
             });
@@ -400,7 +423,7 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void UseItemIntent_CountableItemCommitsPlayerActionAndNotifiesObservers()
+        public void UseItemIntent_DoesNotCountAsPlayerAction()
         {
             Await(async () =>
             {
@@ -411,8 +434,8 @@ namespace Game.Core.Tests
                 CardInstance observer = new CardInstance(new CardInstanceId(2), observerModelId, CardType.Monster);
                 observer.ConfigureCombatStats(6, 0, 0);
                 grid.AddCardToGrid(observer, GridCoord.FromCellIndex(5), true);
-                ModelId itemModelId = new ModelId("test", "countable-item");
-                TestItemModel itemModel = new TestItemModel(itemModelId, countsAsPlayerAction: true);
+                ModelId itemModelId = new ModelId("test", "non-countable-item");
+                TestItemModel itemModel = new TestItemModel(itemModelId);
                 ModelDb.Register(itemModel);
                 CardInstance item = new CardInstance(new CardInstanceId(3), itemModelId, CardType.Item);
                 DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
@@ -421,8 +444,8 @@ namespace Game.Core.Tests
 
                 DomainEventBatch batch = await facade.SubmitIntentAsync(new UseItemIntent(slot));
 
-                Assert.AreEqual(1, context.ActionCounter.Value);
-                Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
+                Assert.AreEqual(0, context.ActionCounter.Value);
+                Assert.IsFalse(batch.Events.Any(e => e.EventType == DomainEventType.PlayerActionCommitted));
                 Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.CardRemoved && e.CardId == item.InstanceId));
             });
         }
@@ -1036,18 +1059,15 @@ namespace Game.Core.Tests
         private sealed class TestItemModel : ItemCardModel
         {
             private readonly ItemTargetMode _targetMode;
-            private readonly bool _countsAsPlayerAction;
 
-            public TestItemModel(ModelId id, ItemTargetMode targetMode = ItemTargetMode.None, bool countsAsPlayerAction = false)
+            public TestItemModel(ModelId id, ItemTargetMode targetMode = ItemTargetMode.None)
             {
                 Id = id;
                 _targetMode = targetMode;
-                _countsAsPlayerAction = countsAsPlayerAction;
             }
 
             public override ModelId Id { get; }
             public override ItemTargetMode TargetMode => _targetMode;
-            public override bool CountsAsPlayerAction => _countsAsPlayerAction;
             public UseItemIntent LastUseIntent { get; private set; }
             public CardInstanceId LastDestroyedCardId { get; private set; }
 

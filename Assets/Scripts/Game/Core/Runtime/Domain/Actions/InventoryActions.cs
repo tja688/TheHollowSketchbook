@@ -109,12 +109,6 @@ namespace Game.Core.Domain.Actions
             });
             await itemModel.UseAsync(useContext);
 
-            if (itemModel.CountsAsPlayerAction)
-            {
-                events.Add(_domain.ActionCounter.Increment(_intent));
-                await _domain.NotifyAfterPlayerActionCommittedAsync(_intent, events);
-            }
-
             int usesRemaining = itemCard.GetState("usesRemaining", itemModel.MaxUses) - 1;
             if (usesRemaining <= 0)
             {
