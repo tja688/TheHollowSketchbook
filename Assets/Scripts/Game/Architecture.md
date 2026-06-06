@@ -50,7 +50,7 @@ Supported intents are defined in `PlayerIntent.cs`:
 | Intent | Meaning | Counts Player Action |
 |---|---|---|
 | `MovePlayerIntent` | Move player card to an empty grid cell. | Yes |
-| `InteractWithCardIntent` | Interact with a face-up top card on the grid. | Yes |
+| `InteractWithCardIntent` | Interact with a face-up top card on the grid. Also handles route choice card selection (room transition). | Yes |
 | `StoreItemIntent` | Move a face-up top item card from grid to inventory. | No |
 | `UseItemIntent` | Use an inventory item with optional target selection. | No (item use never counts as a player action per latest design) |
 | `ChooseOptionIntent` | Resolve an open choice session exactly once. | No |
@@ -151,16 +151,21 @@ Supported baseline behavior includes:
 
 ## Rooms, Decks, And Progression
 
-The minimal L0 room pipeline exists:
+The L0 room pipeline has been extended with batch 2 infrastructure for content-driven deck building, route selection, and room transitions:
 
 | Component | Responsibility |
 |---|---|
 | `DungeonMapGenerator` | Generates the design-specific nine-node layer sequence and choice pools. |
 | `RoomPlan` | Captures room type, layer/node indices, elite/boss flags, and RNG state. |
 | `RunProgressionState` | Tracks current layer/node/room type and pending room choices. |
-| `DungeonDeckBuilder` | Builds room card pools by room type and layer. |
+| `DungeonDeckBuilder` | Builds room card pools by room type and layer. Now accepts optional `RoomContentCatalog` to pick registered content models instead of synthetic ModelIds. Falls back to synthetic IDs when catalog is empty (backward compatible). |
+| `RoomContentCatalog` | Maps card categories (monster tiers, traps, items, room cards, elites, bosses) to registered ModelIds. DungeonDeckBuilder queries this to select real content. |
 | `MonsterAllocationRule` | Allocates monster tiers/counts while matching layer target counts. |
 | `GridDealer` | Deals deck cards into the grid with combat and restaurant policies. |
+| `RoomTransitionService` | Orchestrates post-clear route card generation (with squeeze strategy) and room entry (new grid, deck, player card carryover, progression advance). |
+| `RouteChoiceCardModel` | Base contract for route choice cards placed on grid after room clear. Player selects next room by interacting with a route card. |
+| `GenericRouteChoiceModel` | Default route choice implementation used by infrastructure. L1 should replace with themed variants. |
+| `DomainRunFlow` | Primary entry point for the new Domain run pipeline, replacing the old `RunManager` prototype. |
 
 Known policy currently covered by tests:
 
@@ -213,7 +218,7 @@ This validator is a safety net, not a replacement for using domain APIs.
 
 ## Testing Status
 
-The current core regression suite is `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs` with 34 `[Test]` cases.
+The current core regression suite is `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs` with 42 `[Test]` cases (34 original + 8 batch 2).
 
 Covered areas include:
 
@@ -227,6 +232,10 @@ Covered areas include:
 | Choice sessions | Missing session, valid resolution, duplicate rejection. |
 | Save/restore | Grid, combat reference replacement, deck, inventory, choices, progression, RNG. |
 | Hooks | Relic damage modifiers, trait flip/action/remove lifecycle. |
+| Queue safety | Concurrent submit serialization, reentrant submit rejection, follow-up action enqueue path. |
+| Room pipeline | Map generation, deck counts, monster allocation, grid dealing. |
+| Content catalog (B2) | Catalog registration/query, deck builder uses registered models, fallback to synthetic IDs. |
+| Route & transition (B2) | Route card generation after room clear, squeeze strategy, room entry (new grid/deck/progression), DomainRunFlow initial state, route choice validation (room must be cleared). |
 | Queue safety | Concurrent submit serialization, reentrant submit rejection, follow-up action enqueue path. |
 | Room pipeline | Map generation, deck counts, monster allocation, grid dealing. |
 
@@ -255,9 +264,13 @@ These are known and should not be described as complete:
 | Gap | Impact | Suggested Priority |
 |---|---|---|
 | No `Game.Content.asmdef` under `Assets/Scripts/Game/Content` | **Resolved.** `Game.Content.asmdef` now exists, references only `Game.Core`, and has `noEngineReferences: true`. | Done |
+| No content registration or model-driven deck building | **Resolved (Batch 2).** `RoomContentCatalog` maps categories to registered ModelIds. `DungeonDeckBuilder` picks from catalog when available, falls back to synthetic IDs. | Done |
+| No route selection or room transition flow | **Resolved (Batch 2).** `RouteChoiceCardModel`, `RoomTransitionService`, and `DomainRunFlow` implement the full clear → route cards → enter next room pipeline. | Done |
+| Old RunManager not clearly separated from Domain flow | **Resolved (Batch 2).** `DomainRunFlow` is the canonical entry point. `Assets/Notes/DomainRunFlow.md` documents old vs new flow. `RunManager` retained as legacy prototype only. | Done |
+| Route choice through DomainFacade may NRE during post-interaction lifecycle on new grid | When route card interaction goes through full `PlayerInteractAction` pipeline, `NotifyAfterPlayerActionCommittedAsync` runs on the new grid (replaced by EnterRoom). Cards with unregistered fallback ModelIds are safely skipped, but edge cases in the transition pipeline need hardening. | Medium for L1 integration. |
 | No full player stat layer such as `PlayerRunState` / `StatModifier` | Permanent growth, room temporary buffs, relic stat modifiers, and character identity may tempt direct stat mutation. | High for relic/character work. |
 | No first-class pending trigger queue | Delayed effects can be represented through runtime state and lifecycle hooks, but not yet as saveable scheduled trigger objects. | Medium-high for complex traps. |
-| No formal domain command/query service facade for content authors | Content can still see rich domain objects; conventions rely on review and tests. | Medium. |
+| No unified death/reward pipeline | Monster death rewards only handled in `PlayerInteractAction.RemoveIfDead()`. Non-interaction deaths (items, traps, relics) may miss gold/reward events. | Medium-high for batch 3. |
 | Content folders are mostly empty | L0 is infrastructure-ready, not content-complete. | Expected for next phase. |
 | Presentation contract is event-based but not fully specified per visual payload | Presentation can consume events, but exact animation/audio mapping remains human-designed. | Medium. |
 

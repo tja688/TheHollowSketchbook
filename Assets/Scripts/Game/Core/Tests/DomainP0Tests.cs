@@ -855,6 +855,299 @@ namespace Game.Core.Tests
             Assert.AreEqual(4, restaurantGrid.AllGridCards.Count(card => card.CardType != CardType.Player));
         }
 
+        // ==================== Batch 2 Tests ====================
+
+        [Test]
+        public void RoomContentCatalog_RegisterAndQueryModels()
+        {
+            RoomContentCatalog catalog = new RoomContentCatalog();
+            ModelId skeletonId = new ModelId("l1", "skeleton");
+            ModelId armoredId = new ModelId("l1", "armored-skeleton");
+            ModelId trapId = new ModelId("l1", "crossbow-trap");
+
+            catalog.RegisterMonster(1, skeletonId);
+            catalog.RegisterMonster(1, armoredId);
+            catalog.Register("trap", trapId);
+
+            IReadOnlyList<ModelId> tier1 = catalog.GetAvailableMonsters(1);
+            Assert.AreEqual(2, tier1.Count);
+            CollectionAssert.Contains(tier1, skeletonId);
+            CollectionAssert.Contains(tier1, armoredId);
+
+            Assert.AreEqual(0, catalog.GetAvailableMonsters(2).Count);
+            Assert.IsTrue(catalog.HasCategory("trap"));
+            Assert.IsFalse(catalog.HasCategory("boss"));
+
+            DeterministicRng rng = new DeterministicRng(42);
+            ModelId picked = catalog.PickRandom("trap", rng);
+            Assert.AreEqual(trapId, picked);
+        }
+
+        [Test]
+        public void DungeonDeckBuilder_WithCatalog_UsesRegisteredModelIds()
+        {
+            // Register prototype models for tier 1 and tier 2 (node 1 uses both)
+            ModelId monsterL1Id = new ModelId("l1", "skeleton");
+            TestMonsterModel skeletonModel = new TestMonsterModel(monsterL1Id, 6, 2, 0);
+            ModelDb.Register(skeletonModel);
+
+            ModelId monsterL2Id = new ModelId("l1", "armored-skeleton");
+            TestMonsterModel armoredModel = new TestMonsterModel(monsterL2Id, 8, 3, 1);
+            ModelDb.Register(armoredModel);
+
+            RoomContentCatalog catalog = new RoomContentCatalog();
+            catalog.RegisterMonster(1, monsterL1Id);
+            catalog.RegisterMonster(2, monsterL2Id);
+
+            DungeonDeckBuilder builder = new DungeonDeckBuilder(catalog);
+            DungeonDeck deck = builder.Build(
+                new RoomPlan(RoomType.Combat, 1, 1, false, false, new RngState(7)),
+                null,
+                new DeterministicRng(7));
+
+            // Node 1 allocates tier 1 and tier 2 monsters; all should use registered model IDs
+            IEnumerable<CardInstance> monsters = deck.Cards.Where(card => card.CardType == CardType.Monster);
+            Assert.IsTrue(monsters.All(m => m.ModelId == monsterL1Id || m.ModelId == monsterL2Id),
+                "All monsters should use registered model IDs from catalog");
+            Assert.IsTrue(monsters.Any(m => m.ModelId == monsterL1Id),
+                "Should have at least one tier 1 monster");
+            Assert.IsTrue(monsters.Any(m => m.ModelId == monsterL2Id),
+                "Should have at least one tier 2 monster");
+        }
+
+        [Test]
+        public void DungeonDeckBuilder_WithoutCatalog_FallsBackToSyntheticIds()
+        {
+            // No catalog: should use synthetic "l0" ModelIds (backward compatibility)
+            DungeonDeckBuilder builder = new DungeonDeckBuilder();
+            DungeonDeck deck = builder.Build(
+                new RoomPlan(RoomType.Combat, 1, 2, false, false, new RngState(11)),
+                null,
+                new DeterministicRng(11));
+
+            Assert.IsTrue(deck.Cards.Count(card => card.CardType == CardType.Monster) > 0);
+            IEnumerable<CardInstance> monsters = deck.Cards.Where(card => card.CardType == CardType.Monster);
+            Assert.IsTrue(monsters.All(monster => monster.ModelId.Category == "l0"),
+                "Without catalog, all monsters should use synthetic l0 ModelIds");
+        }
+
+        [Test]
+        public void RouteCardGenerator_AfterRoomClear_PlacesRouteCardsOnGrid()
+        {
+            Await(async () =>
+            {
+                // Register route choice models
+                RegisterRouteChoiceModels();
+
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 1, 0, 0);
+
+                // Place a single weak monster
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 2, attack: 0, defense: 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                context.Rng = new DeterministicRng(42);
+                context.Progression = new RunProgressionState(1, 2, RoomType.Combat, System.Array.Empty<RoomType>());
+                context.RoomTransition = new RoomTransitionService(
+                    new DungeonMapGenerator(), new DungeonDeckBuilder(), new GridDealer());
+
+                DomainFacade facade = new DomainFacade(context);
+
+                // Kill the last monster -> room cleared -> route cards generated
+                await facade.SubmitIntentAsync(new InteractWithCardIntent(monster.InstanceId));
+
+                // Verify room cleared and route cards were generated
+                DomainEventBatch lastBatch = context.Batches.Last();
+                Assert.IsTrue(lastBatch.Events.Any(e => e.EventType == DomainEventType.RoomCleared));
+                Assert.IsTrue(lastBatch.Events.Any(e => e.EventType == DomainEventType.RouteChoicesGenerated));
+
+                // Verify route choice cards are on the grid
+                IEnumerable<CardInstance> routeCards = grid.AllGridCards.Where(c => c.CardType == CardType.RouteChoice);
+                Assert.IsTrue(routeCards.Count() >= 2, "Should have at least 2 route choice cards");
+                Assert.IsTrue(routeCards.All(c => c.IsFaceUp), "Route choice cards should be face-up");
+
+                // Verify progression was updated with pending choices
+                Assert.IsTrue(context.Progression.PendingChoices.Count >= 2);
+            });
+        }
+
+        [Test]
+        public void IntentValidator_RejectsRouteChoiceWhenRoomNotCleared()
+        {
+            // Register route choice models
+            RegisterRouteChoiceModels();
+
+            GridState grid = NewGridWithPlayer();
+
+            // Place a monster (room NOT cleared)
+            CardInstance monster = NewCard(2, CardType.Monster, hp: 10, attack: 0, defense: 0);
+            grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+
+            // Place a route choice card
+            ModelId routeId = new ModelId("route", "gold");
+            CardInstance routeCard = new CardInstance(new CardInstanceId(99), routeId, CardType.RouteChoice);
+            grid.AddCardToGrid(routeCard, GridCoord.FromCellIndex(3), true);
+
+            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+            DomainFacade facade = new DomainFacade(context);
+
+            // Try to interact with route choice card while room is not cleared
+            Await(async () =>
+            {
+                DomainEventBatch batch = await facade.SubmitIntentAsync(new InteractWithCardIntent(routeCard.InstanceId));
+                Assert.IsTrue(batch.Events.Any(e => e.EventType == DomainEventType.IntentRejected && e.Reason == "RoomNotCleared"));
+            });
+        }
+
+        [Test]
+        public void RoomTransition_EnterRoom_CreatesNewGridAndAdvancesProgression()
+        {
+            Await(async () =>
+            {
+                RegisterRouteChoiceModels();
+
+                GridState grid = NewGridWithPlayer();
+                CardInstance player = grid.PlayerCard;
+                player.ConfigureCombatStats(20, 5, 1, 0, 0);
+                player.SetCurrentHp(15); // Simulate damage taken
+
+                // Place a single weak monster
+                CardInstance monster = NewCard(2, CardType.Monster, hp: 2, attack: 0, defense: 0);
+                grid.AddCardToGrid(monster, GridCoord.FromCellIndex(5), true);
+
+                DungeonDeckBuilder deckBuilder = new DungeonDeckBuilder();
+                RoomTransitionService transition = new RoomTransitionService(
+                    new DungeonMapGenerator(), deckBuilder, new GridDealer());
+
+                DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+                context.Rng = new DeterministicRng(42);
+                context.Progression = new RunProgressionState(1, 2, RoomType.Combat, System.Array.Empty<RoomType>());
+                context.RoomTransition = transition;
+
+                DomainFacade facade = new DomainFacade(context);
+
+                // Kill monster -> room clear -> route cards generated
+                DomainEventBatch killBatch = await facade.SubmitIntentAsync(new InteractWithCardIntent(monster.InstanceId));
+                Assert.IsNotNull(killBatch, "Kill batch should not be null");
+                Assert.IsTrue(killBatch.Events.Any(e => e.EventType == DomainEventType.RoomCleared),
+                    "Room should be cleared");
+                Assert.IsTrue(killBatch.Events.Any(e => e.EventType == DomainEventType.RouteChoicesGenerated),
+                    "Route choices should be generated");
+
+                // Find a route choice card
+                CardInstance routeCard = context.Grid.AllGridCards.FirstOrDefault(c => c.CardType == CardType.RouteChoice && c.IsFaceUp);
+                Assert.IsNotNull(routeCard, "Should have a route choice card");
+
+                // Test EnterRoom directly to isolate NRE
+                CardInstance currentPlayer = context.Grid.PlayerCard;
+                Assert.IsNotNull(currentPlayer, "Player card should exist before transition");
+
+                RoomType targetRoom = RoomType.Combat;
+                if (routeCard != null)
+                {
+                    CardModel routeModel = context.ResolveCardModel(routeCard);
+                    if (routeModel is GenericRouteChoiceModel grm)
+                    {
+                        targetRoom = grm.TargetRoomType;
+                    }
+                }
+
+                // Call EnterRoom directly
+                CardInteractionContext directCtx = new CardInteractionContext(
+                    context, context.Grid.PlayerCard, routeCard, new InteractWithCardIntent(routeCard.InstanceId), new List<DomainEvent>());
+                List<DomainEvent> enterEvents = transition.EnterRoom(directCtx, targetRoom);
+
+                Assert.IsTrue(enterEvents.Any(e => e.EventType == DomainEventType.RoomEntered),
+                    "RoomEntered event should be emitted");
+                Assert.IsNotNull(context.Grid.PlayerCard, "New grid should have a player card");
+                Assert.AreEqual(GridCoord.FromCellIndex(8), context.Grid.PlayerCard.Coord.Value);
+                Assert.AreEqual(15, context.Grid.PlayerCard.CurrentHp, "Player HP should carry over");
+                Assert.AreEqual(3, context.Progression.NodeIndex, "Should advance to next node");
+                Assert.AreEqual(1, context.Progression.LayerIndex, "Should stay on same layer");
+                Assert.IsNotNull(context.DungeonDeck);
+                Assert.IsTrue(context.Grid.AllGridCards.Count(c => c.CardType != CardType.Player) > 0,
+                    "New room should have cards on the grid");
+            });
+        }
+
+        [Test]
+        public void DomainRunFlow_StartNewRun_CreatesValidInitialState()
+        {
+            DomainRunFlow flow = new DomainRunFlow();
+            DomainActionContext context = flow.StartNewRun(
+                seed: 12345,
+                playerModelId: new ModelId("player", "hero"),
+                playerMaxHp: 30,
+                playerAttack: 5,
+                playerDefense: 2);
+
+            Assert.IsNotNull(context);
+            Assert.IsNotNull(context.Grid);
+            Assert.IsNotNull(context.Grid.PlayerCard);
+            Assert.AreEqual(30, context.Grid.PlayerCard.MaxHp);
+            Assert.AreEqual(5, context.Grid.PlayerCard.Attack);
+            Assert.AreEqual(2, context.Grid.PlayerCard.Defense);
+            Assert.AreEqual(GridCoord.FromCellIndex(8), context.Grid.PlayerCard.Coord.Value);
+
+            // Node 1 is Reward room
+            Assert.IsNotNull(context.Progression);
+            Assert.AreEqual(1, context.Progression.LayerIndex);
+            Assert.AreEqual(1, context.Progression.NodeIndex);
+            Assert.AreEqual(RoomType.Reward, context.Progression.CurrentRoomType);
+
+            // Dungeon deck should exist and have been dealt
+            Assert.IsNotNull(context.DungeonDeck);
+            Assert.IsTrue(context.Grid.AllGridCards.Count(c => c.CardType != CardType.Player) > 0);
+
+            // RoomTransition and Rng should be set
+            Assert.IsNotNull(context.RoomTransition);
+            Assert.IsNotNull(context.Rng);
+        }
+
+        [Test]
+        public void RoomTransitionService_SqueezeStrategy_WhenNoEmptyCells()
+        {
+            RegisterRouteChoiceModels();
+
+            GridState grid = NewGridWithPlayer();
+
+            // Fill all non-player cells with cards (no empty cells)
+            for (int cell = 1; cell <= 9; cell++)
+            {
+                if (cell == 8) continue; // Skip player cell
+                CardInstance filler = NewCard((uint)(cell + 100), CardType.Item);
+                grid.AddCardToGrid(filler, GridCoord.FromCellIndex(cell), true);
+            }
+
+            RoomTransitionService transition = new RoomTransitionService(
+                new DungeonMapGenerator(), new DungeonDeckBuilder(), new GridDealer());
+
+            DomainActionContext context = new DomainActionContext(grid, new PlayerActionCounter());
+            context.Rng = new DeterministicRng(42);
+            context.Progression = new RunProgressionState(1, 2, RoomType.Combat, System.Array.Empty<RoomType>());
+
+            List<DomainEvent> events = transition.GenerateAndPlaceRouteCards(context, context.Rng);
+
+            // Route cards should be placed even with no empty cells (squeeze)
+            IEnumerable<CardInstance> routeCards = grid.AllGridCards.Where(c => c.CardType == CardType.RouteChoice);
+            Assert.IsTrue(routeCards.Count() >= 2, "Route cards should be placed via squeeze strategy");
+            Assert.IsTrue(events.Any(e => e.EventType == DomainEventType.RouteChoicesGenerated));
+        }
+
+        private static void RegisterRouteChoiceModels()
+        {
+            foreach (RoomType rt in System.Enum.GetValues(typeof(RoomType)))
+            {
+                ModelId routeId = new ModelId("route", rt.ToString().ToLowerInvariant());
+                if (!ModelDb.Contains(routeId))
+                {
+                    ModelDb.Register(new GenericRouteChoiceModel(routeId, rt));
+                }
+            }
+        }
+
         private sealed class TestRelicModel : Game.Core.Domain.ContentContracts.RelicModel
         {
             private readonly System.Func<DamageContext, int, int> _modifyDealt;

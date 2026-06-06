@@ -4,6 +4,7 @@ using Game.Core.Domain.Cards;
 using Game.Core.Domain.ContentContracts;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Inventory;
+using Game.Core.Domain.Rooms;
 
 namespace Game.Core.Domain.Interaction
 {
@@ -107,6 +108,15 @@ namespace Game.Core.Domain.Interaction
                 if (!target.IsFaceUp)
                 {
                     return IntentValidationResult.Invalid("TargetFaceDown");
+                }
+
+                // Route choice cards can only be interacted with after room is cleared
+                if (target.CardType == CardType.RouteChoice && _domain != null)
+                {
+                    if (!_domain.RoomClearChecker.IsRoomCleared(_grid))
+                    {
+                        return IntentValidationResult.Invalid("RoomNotCleared");
+                    }
                 }
 
                 return IntentValidationResult.Valid();

@@ -37,6 +37,8 @@ namespace Game.Core.Domain
         public DungeonDeck DungeonDeck { get; set; }
         public IRng Rng { get; set; }
         public RunProgressionState Progression { get; set; }
+        public RoomTransitionService RoomTransition { get; set; }
+        public RoomContentCatalog ContentCatalog { get; set; }
         public PlayerInventory ItemInventory { get; }
         public RelicInventory Relics { get; }
         public ChoiceSessionStore ChoiceSessions { get; }

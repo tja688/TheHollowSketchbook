@@ -140,6 +140,12 @@ namespace Game.Core.Domain.Actions
             if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))
             {
                 events.Add(new DomainEvent(DomainEventType.RoomCleared));
+
+                if (_domain.RoomTransition != null && _domain.Rng != null)
+                {
+                    List<DomainEvent> routeEvents = _domain.RoomTransition.GenerateAndPlaceRouteCards(_domain, _domain.Rng);
+                    events.AddRange(routeEvents);
+                }
             }
 
             AddBatch(events);
@@ -201,6 +207,12 @@ namespace Game.Core.Domain.Actions
             if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))
             {
                 events.Add(new DomainEvent(DomainEventType.RoomCleared));
+
+                if (_domain.RoomTransition != null && _domain.Rng != null)
+                {
+                    List<DomainEvent> routeEvents = _domain.RoomTransition.GenerateAndPlaceRouteCards(_domain, _domain.Rng);
+                    events.AddRange(routeEvents);
+                }
             }
 
             AddBatch(events);

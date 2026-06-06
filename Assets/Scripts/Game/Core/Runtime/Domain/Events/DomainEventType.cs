@@ -26,6 +26,8 @@ namespace Game.Core.Domain.Events
         MonsterDefeated,
         RoomCleared,
         RouteChoicesGenerated,
+        RouteChoiceSelected,
+        RoomTransitioned,
         IntentRejected,
         RunEnded
     }
