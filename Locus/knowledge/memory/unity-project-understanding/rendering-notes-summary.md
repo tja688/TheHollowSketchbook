@@ -10,13 +10,13 @@ readOnly: false
 aiMaintained: true
 explicitMaintenanceRules: true
 createdAt: 1779672335148
-updatedAt: 1780649753719
+updatedAt: 1780755305499
 ---
 
 # rendering-notes-summary
 
 ## Summary
-Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, shadow behavior of RetroFakeLit, card-face printing prototypes, the TestPlane TMP surface prototype, and current RetroFakeLit card/text rendering constraints.
+Concise lookup cache for current render validation scene, comfort tuning, render console entry/assets, shadow behavior of RetroFakeLit, card-face printing prototypes, the TestPlane TMP surface prototype, and current RetroFakeLit/world-space card text rendering constraints.
 
 <!-- locus:maintain-rules:start -->
 - Record only Unity project structure knowledge and lookup info that reduce repeated exploration
@@ -57,6 +57,7 @@ Concise lookup cache for current render validation scene, comfort tuning, render
 - `Assets/_Project/Rendering/Shaders/RetroFakeLit.shader` now includes optional UV-based rounded card clipping and edge darkening controls (`_UseRoundedClip`, `_CardAspect`, `_CornerRadius`, `_EdgeSoftness`, `_EdgeDarkenWidth`, `_EdgeDarkenStrength`) so card prefabs can keep RetroFakeLit lighting while regaining rounded silhouettes without extra border geometry.
 - Current rounded-card test material: `Assets/_Project/Rendering/Materials/RetroFakeLitGenerated/M_RetroFakeLit_scene_card_colour_12f771db_Rounded.mat`, applied to `Assets/Arts/Prefabs/RetroFakeLits/卡牌-RetroFakeLit (1).prefab` and its scene instance in `Assets/Tests/render.unity`.
 - `Assets/Tests/render.unity/最终版卡牌-RetroFakeLit` currently tests a child world-space Canvas + `TextMeshProUGUI` title overlay on top of the card mesh, while the card itself uses `Assets/_Project/Rendering/Materials/RetroFakeLitTransparentCard.mat` (`Transparent`, queue 3000, `ZWrite Off`). This setup is angle-fragile: the card and the TMP UI both render in transparent queue without depth writes, so ordering becomes camera-dependent and the text can appear to pop behind the card or be swallowed when the viewing angle changes.
+- `Assets/Tests/render.unity/桌子/九宫场地格/格7` and `格9` previously had world-space `Canvas` card faces whose text children were plain `TextMeshPro` (3D mesh renderer), not `TextMeshProUGUI`; those text objects therefore did not participate in Canvas draw order and could sort against the card face by camera/depth. They have been converted in-scene to `TextMeshProUGUI` so the card-face text now renders through the parent Canvas.
 - Practical direction for stable “text glued to card face”: prefer baking card title/graphics into the card face texture/material, or render them on a dedicated front-face mesh/quad using an opaque or alpha-clipped shader with a tiny normal offset. Avoid relying on world-space UGUI sitting almost coplanar over a transparent card surface.
 
 ## Plane TMP Surface Prototype
