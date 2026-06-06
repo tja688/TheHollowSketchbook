@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Game.Core;
 using Game.Core.Domain.Cards;
@@ -10,6 +11,7 @@ using Game.Core.Domain.Events;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
 using Game.Core.Domain.Inventory;
+using Game.Core.Domain.Progression;
 using Game.Core.Domain.Rooms;
 using Game.Core.Models;
 using Game.Core.Random;
@@ -28,6 +30,8 @@ namespace Game.Core.Domain
             ItemInventory = new PlayerInventory();
             Relics = new RelicInventory();
             ChoiceSessions = new ChoiceSessionStore();
+            PendingTriggers = new PendingTriggerQueue();
+            PlayerRunState = CreateInitialPlayerRunState(grid);
         }
 
         public GridState Grid { get; internal set; }
@@ -42,6 +46,8 @@ namespace Game.Core.Domain
         public PlayerInventory ItemInventory { get; }
         public RelicInventory Relics { get; }
         public ChoiceSessionStore ChoiceSessions { get; }
+        public PendingTriggerQueue PendingTriggers { get; }
+        public PlayerRunState PlayerRunState { get; set; }
         public int PlayerGold { get; private set; }
 
         public void ReplaceGrid(GridState grid)
@@ -54,6 +60,18 @@ namespace Game.Core.Domain
         {
             PlayerGold = Math.Max(0, value);
         }
+
+        private static PlayerRunState CreateInitialPlayerRunState(GridState grid)
+        {
+            CardInstance player = grid != null ? grid.PlayerCard : null;
+            if (player == null)
+            {
+                return new PlayerRunState(0, 0, 0);
+            }
+
+            return new PlayerRunState(player.MaxHp, player.Attack, player.Defense);
+        }
+
         public List<DomainEventBatch> Batches { get; } = new List<DomainEventBatch>();
 
         public CardModel ResolveCardModel(CardInstance card)
@@ -156,6 +174,78 @@ namespace Game.Core.Domain
                 PlayerActionContext context = new PlayerActionContext(this, card, sourceIntent, actionIndex, events);
                 await model.OnAfterPlayerActionCommittedAsync(context);
                 await NotifyCardTraitHooksAsync(card, trait => trait.OnPlayerActionCommittedAsync(context));
+            }
+
+            await DispatchDuePendingTriggersAsync(sourceIntent, actionIndex, events).ConfigureAwait(false);
+        }
+
+        private async Task DispatchDuePendingTriggersAsync(PlayerIntent sourceIntent, int actionIndex, List<DomainEvent> events)
+        {
+            IReadOnlyList<PendingTrigger> due = PendingTriggers.DequeueDue(PendingTriggerTiming.AfterPlayerAction, actionIndex);
+            for (int i = 0; i < due.Count; i++)
+            {
+                PendingTrigger trigger = due[i];
+                if (!Grid.TryGetCard(trigger.CardId, out CardInstance card) || card.Zone != CardZone.Grid)
+                {
+                    continue;
+                }
+
+                if (!TryResolveCardModel(card, out CardModel model))
+                {
+                    continue;
+                }
+
+                events.Add(new DomainEvent(DomainEventType.TrapTriggered)
+                {
+                    CardId = card.InstanceId,
+                    Reason = trigger.TriggerKey,
+                    Amount = actionIndex
+                });
+
+                PendingTriggerContext context = new PendingTriggerContext(this, card, trigger, actionIndex, events);
+                await model.OnPendingTriggerAsync(context).ConfigureAwait(false);
+            }
+
+            ResolveDeadCards(events);
+        }
+
+        public void ResolveDeadCards(ICollection<DomainEvent> events)
+        {
+            List<CardInstance> deadCards = Grid.AllGridCards
+                .Where(card => card.HasHitPoints && !card.IsAlive && card.Zone == CardZone.Grid)
+                .ToList();
+
+            for (int i = 0; i < deadCards.Count; i++)
+            {
+                CardInstance card = deadCards[i];
+                if (card.Zone != CardZone.Grid || !card.HasHitPoints || card.IsAlive)
+                {
+                    continue;
+                }
+
+                RemoveReason reason = card.CardType == CardType.Trap ? RemoveReason.Destroyed : RemoveReason.Defeated;
+                GridOperationResult remove = Grid.RemoveCard(card, reason);
+                if (!remove.Succeeded)
+                {
+                    continue;
+                }
+
+                foreach (DomainEvent domainEvent in remove.Events)
+                {
+                    events?.Add(domainEvent);
+                }
+
+                if (card.CardType == CardType.Monster)
+                {
+                    events?.Add(new DomainEvent(DomainEventType.MonsterDefeated)
+                    {
+                        CardId = card.InstanceId,
+                        Reason = reason.ToString()
+                    });
+
+                    int reward = card.GoldOnRemoved + card.GetState("eliteGoldBonus", 0) + card.GetState("bossGoldBonus", 0);
+                    GainGold(reward, events, "MonsterRemoved");
+                }
             }
         }
 
@@ -266,6 +356,8 @@ namespace Game.Core.Domain
             }
 
             await NotifyRelicHooksAsync(r => r.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
+            await NotifyCardModelHookAsync(ctx.SourceCard, m => m.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
+            await NotifyCardModelHookAsync(ctx.TargetCard, m => m.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
             await NotifyCardTraitHooksAsync(ctx.SourceCard, t => t.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
             await NotifyCardTraitHooksAsync(ctx.TargetCard, t => t.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
         }
@@ -367,6 +459,16 @@ namespace Game.Core.Domain
                     await notify(trait).ConfigureAwait(false);
                 }
             }
+        }
+
+        private async Task NotifyCardModelHookAsync(CardInstance card, Func<CardModel, Task> notify)
+        {
+            if (card == null || !TryResolveCardModel(card, out CardModel model))
+            {
+                return;
+            }
+
+            await notify(model).ConfigureAwait(false);
         }
 
         private int ModifyDamageByCardTraits(CardInstance card, Func<TraitModel, int> modify, int current)

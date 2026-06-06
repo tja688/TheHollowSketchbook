@@ -142,9 +142,10 @@ namespace Game.Core.Domain.Rooms
 
             CardInstance playerCard = domain.Grid != null ? domain.Grid.PlayerCard : null;
             int playerHp = playerCard != null ? playerCard.CurrentHp : 20;
-            int playerMaxHp = playerCard != null ? playerCard.MaxHp : 20;
-            int playerAttack = playerCard != null ? playerCard.Attack : 3;
-            int playerDefense = playerCard != null ? playerCard.Defense : 1;
+            domain.PlayerRunState?.ClearRoomState();
+            int playerMaxHp = domain.PlayerRunState != null ? domain.PlayerRunState.CurrentMaxHp : playerCard != null ? playerCard.MaxHp : 20;
+            int playerAttack = domain.PlayerRunState != null ? domain.PlayerRunState.CurrentAttack : playerCard != null ? playerCard.Attack : 3;
+            int playerDefense = domain.PlayerRunState != null ? domain.PlayerRunState.CurrentDefense : playerCard != null ? playerCard.Defense : 1;
 
             // Determine next node and layer
             int nextNodeIndex = current.NodeIndex + 1;

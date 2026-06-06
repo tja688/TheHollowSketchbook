@@ -4,6 +4,7 @@ using Game.Core.Domain.Cards;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Inventory;
 using Game.Core.Domain.Interaction;
+using Game.Core.Domain.Progression;
 using Game.Core.Domain.Rooms;
 
 namespace Game.Core.Saves
@@ -94,6 +95,42 @@ namespace Game.Core.Saves
     }
 
     [Serializable]
+    public sealed class StatModifierSaveDto
+    {
+        public int Stat;
+        public int Scope;
+        public int Amount;
+        public string Source;
+    }
+
+    [Serializable]
+    public sealed class KeywordStateSaveDto
+    {
+        public string Keyword;
+        public int Scope;
+        public int Value;
+    }
+
+    [Serializable]
+    public sealed class PlayerRunStateSaveDto
+    {
+        public int BaseMaxHp;
+        public int BaseAttack;
+        public int BaseDefense;
+        public List<StatModifierSaveDto> Modifiers = new List<StatModifierSaveDto>();
+        public List<KeywordStateSaveDto> Keywords = new List<KeywordStateSaveDto>();
+    }
+
+    [Serializable]
+    public sealed class PendingTriggerSaveDto
+    {
+        public uint CardInstanceId;
+        public int Timing;
+        public int DueActionIndex;
+        public string TriggerKey;
+    }
+
+    [Serializable]
     public sealed class RoomDomainStateSaveDto
     {
         public int RoomType;
@@ -106,8 +143,10 @@ namespace Game.Core.Saves
         public DungeonDeckSaveDto DungeonDeck;
         public PlayerInventorySaveDto ItemInventory;
         public RelicInventorySaveDto RelicInventory;
+        public PlayerRunStateSaveDto PlayerRunState;
         public List<ChoiceSessionSaveDto> ActiveChoices = new List<ChoiceSessionSaveDto>();
         public List<uint> PendingTriggerCardInstanceIds = new List<uint>();
+        public List<PendingTriggerSaveDto> PendingTriggers = new List<PendingTriggerSaveDto>();
         public List<int> RouteChoiceRoomTypes = new List<int>();
     }
 }

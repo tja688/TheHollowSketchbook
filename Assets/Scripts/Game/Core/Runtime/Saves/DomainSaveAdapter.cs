@@ -6,6 +6,7 @@ using Game.Core.Domain.Deck;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
 using Game.Core.Domain.Inventory;
+using Game.Core.Domain.Progression;
 using Game.Core.Domain.Rooms;
 using Game.Core.Models;
 using Game.Core.Random;
@@ -34,7 +35,9 @@ namespace Game.Core.Saves
                 DungeonDeck = CaptureDungeonDeck(domain.DungeonDeck),
                 ItemInventory = CaptureItemInventory(domain.ItemInventory),
                 RelicInventory = CaptureRelicInventory(domain.Relics),
+                PlayerRunState = CapturePlayerRunState(domain.PlayerRunState),
                 ActiveChoices = CaptureChoiceSessions(domain.ChoiceSessions),
+                PendingTriggers = CapturePendingTriggers(domain.PendingTriggers),
                 RngState = domain.Rng != null ? domain.Rng.CaptureState().Value : null
             };
 
@@ -64,6 +67,8 @@ namespace Game.Core.Saves
 
             domain.ActionCounter.RestoreValue(dto.ActionCounterValue);
             domain.SetPlayerGold(dto.PlayerGold);
+            domain.PlayerRunState = RestorePlayerRunState(dto.PlayerRunState, domain.Grid);
+            RestorePendingTriggers(dto.PendingTriggers, domain.PendingTriggers);
             RestoreRng(dto.RngState, domain);
 
             Dictionary<uint, CardInstance> cardLookup = BuildCardLookup(domain.Grid);
@@ -304,6 +309,76 @@ namespace Game.Core.Saves
             return result;
         }
 
+        public static PlayerRunStateSaveDto CapturePlayerRunState(PlayerRunState state)
+        {
+            if (state == null)
+            {
+                return null;
+            }
+
+            PlayerRunStateSaveDto dto = new PlayerRunStateSaveDto
+            {
+                BaseMaxHp = state.BaseMaxHp,
+                BaseAttack = state.BaseAttack,
+                BaseDefense = state.BaseDefense
+            };
+
+            foreach (StatModifier modifier in state.Modifiers)
+            {
+                dto.Modifiers.Add(new StatModifierSaveDto
+                {
+                    Stat = (int)modifier.Stat,
+                    Scope = (int)modifier.Scope,
+                    Amount = modifier.Amount,
+                    Source = modifier.Source
+                });
+            }
+
+            foreach (KeyValuePair<string, int> keyword in state.PermanentKeywords)
+            {
+                dto.Keywords.Add(new KeywordStateSaveDto
+                {
+                    Keyword = keyword.Key,
+                    Scope = (int)StatModifierScope.Permanent,
+                    Value = keyword.Value
+                });
+            }
+
+            foreach (KeyValuePair<string, int> keyword in state.RoomKeywords)
+            {
+                dto.Keywords.Add(new KeywordStateSaveDto
+                {
+                    Keyword = keyword.Key,
+                    Scope = (int)StatModifierScope.Room,
+                    Value = keyword.Value
+                });
+            }
+
+            return dto;
+        }
+
+        public static List<PendingTriggerSaveDto> CapturePendingTriggers(PendingTriggerQueue queue)
+        {
+            List<PendingTriggerSaveDto> result = new List<PendingTriggerSaveDto>();
+            if (queue == null)
+            {
+                return result;
+            }
+
+            foreach (PendingTrigger trigger in queue.Items)
+            {
+                result.Add(new PendingTriggerSaveDto
+                {
+                    CardInstanceId = trigger.CardId.Value,
+                    Timing = (int)trigger.Timing,
+                    DueActionIndex = trigger.DueActionIndex,
+                    TriggerKey = trigger.TriggerKey
+                });
+            }
+
+            return result;
+        }
+
         public static GridState RestoreGrid(GridStateSaveDto dto)
         {
             if (dto == null)
@@ -451,6 +526,60 @@ namespace Game.Core.Saves
             }
 
             domain.Rng = new DeterministicRng(new RngState(rngState.Value));
+        }
+
+        public static PlayerRunState RestorePlayerRunState(PlayerRunStateSaveDto dto, GridState grid)
+        {
+            PlayerRunState state;
+            if (dto == null)
+            {
+                CardInstance player = grid != null ? grid.PlayerCard : null;
+                return player != null
+                    ? new PlayerRunState(player.MaxHp, player.Attack, player.Defense)
+                    : new PlayerRunState(0, 0, 0);
+            }
+
+            state = new PlayerRunState(dto.BaseMaxHp, dto.BaseAttack, dto.BaseDefense);
+            if (dto.Modifiers != null)
+            {
+                foreach (StatModifierSaveDto modifier in dto.Modifiers)
+                {
+                    state.AddModifier(new StatModifier((PlayerStat)modifier.Stat, (StatModifierScope)modifier.Scope, modifier.Amount, modifier.Source));
+                }
+            }
+
+            if (dto.Keywords != null)
+            {
+                foreach (KeywordStateSaveDto keyword in dto.Keywords)
+                {
+                    state.SetKeyword(keyword.Keyword, keyword.Value, (StatModifierScope)keyword.Scope);
+                }
+            }
+
+            return state;
+        }
+
+        public static void RestorePendingTriggers(List<PendingTriggerSaveDto> dtos, PendingTriggerQueue queue)
+        {
+            if (queue == null)
+            {
+                return;
+            }
+
+            queue.Clear();
+            if (dtos == null)
+            {
+                return;
+            }
+
+            foreach (PendingTriggerSaveDto dto in dtos)
+            {
+                queue.Enqueue(new PendingTrigger(
+                    new CardInstanceId(dto.CardInstanceId),
+                    (PendingTriggerTiming)dto.Timing,
+                    dto.DueActionIndex,
+                    dto.TriggerKey));
+            }
         }
 
         public static void RestoreProgression(RoomDomainStateSaveDto dto, DomainActionContext domain)

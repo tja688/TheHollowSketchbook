@@ -56,8 +56,7 @@ namespace Game.Core.Domain.Actions
             await model.OnPlayerInteractAsync(interactionContext);
             events.Add(_domain.ActionCounter.Increment(_intent));
             await _domain.NotifyAfterPlayerActionCommittedAsync(_intent, events);
-            RemoveIfDead(target, events, ctx);
-            RemoveIfDead(player, events, ctx);
+            _domain.ResolveDeadCards(events);
             await _domain.ProcessLifecycleAsync(events);
             _domain.AppendPlayerDefeatedIfNeeded(events);
 
@@ -96,28 +95,6 @@ namespace Game.Core.Domain.Actions
                 CardId = target.InstanceId,
                 Reason = routeModel.TargetRoomType.ToString()
             });
-        }
-
-        private void RemoveIfDead(CardInstance card, List<DomainEvent> events, GameActionExecutionContext ctx)
-        {
-            if (card == null || !card.HasHitPoints || card.IsAlive || card.Zone != CardZone.Grid)
-            {
-                return;
-            }
-
-            RemoveReason reason = card.CardType == CardType.Trap ? RemoveReason.Destroyed : RemoveReason.Defeated;
-            GridOperationResult remove = _domain.Grid.RemoveCard(card, reason);
-            events.AddRange(remove.Events);
-            ctx.EnqueueFollowUpActions(remove.FollowUpActions);
-            if (card.CardType == CardType.Monster)
-            {
-                events.Add(new DomainEvent(DomainEventType.MonsterDefeated)
-                {
-                    CardId = card.InstanceId,
-                    Reason = reason.ToString()
-                });
-                _domain.GainGold(card.GoldOnRemoved, events, "MonsterRemoved");
-            }
         }
 
         private void AddBatch(IEnumerable<DomainEvent> events)

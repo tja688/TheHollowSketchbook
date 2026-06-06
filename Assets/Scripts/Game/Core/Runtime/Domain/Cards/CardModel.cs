@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Game.Core.Domain.Combat;
 using Game.Core.Domain.ContentContracts;
 using Game.Core.Models;
 
@@ -54,6 +55,16 @@ namespace Game.Core.Domain.Cards
         }
 
         public virtual Task OnAfterPlayerActionCommittedAsync(PlayerActionContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnPendingTriggerAsync(PendingTriggerContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnAfterDamageAsync(DamageContext ctx, DamageResult result)
         {
             return Task.CompletedTask;
         }

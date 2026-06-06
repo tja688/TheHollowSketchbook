@@ -7,6 +7,7 @@ using Game.Core.Domain.Events;
 using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
 using Game.Core.Domain.Inventory;
+using Game.Core.Domain.Progression;
 
 namespace Game.Core.Domain.ContentContracts
 {
@@ -124,6 +125,24 @@ namespace Game.Core.Domain.ContentContracts
 
         public PlayerIntent SourceIntent { get; }
         public int ActionIndex { get; }
+    }
+
+    public sealed class PendingTriggerContext : DomainCallbackContext
+    {
+        public PendingTriggerContext(DomainActionContext domain, CardInstance card, PendingTrigger trigger, int actionIndex, ICollection<DomainEvent> events)
+            : base(domain, card, events)
+        {
+            Trigger = trigger ?? throw new ArgumentNullException(nameof(trigger));
+            ActionIndex = actionIndex;
+        }
+
+        public PendingTrigger Trigger { get; }
+        public int ActionIndex { get; }
+
+        public CardInstance PlayerCard
+        {
+            get { return Domain.Grid.PlayerCard; }
+        }
     }
 
     public sealed class TrapContext : DomainCallbackContext

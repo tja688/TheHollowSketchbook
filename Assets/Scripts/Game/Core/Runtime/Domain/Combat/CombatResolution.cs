@@ -44,7 +44,7 @@ namespace Game.Core.Domain.Combat
             }
 
             _grid.TryGetCard(info.Source.CardId, out CardInstance sourceCard);
-            DamageContext damageCtx = new DamageContext(info, sourceCard, target);
+            DamageContext damageCtx = new DamageContext(info, sourceCard, target, Domain);
 
             // Phase 1: BeforeDamage hooks
             await NotifyBeforeDamageAsync(damageCtx).ConfigureAwait(false);

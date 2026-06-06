@@ -108,6 +108,7 @@ namespace Game.Core.Domain.Actions
                 Reason = itemModel.Id.ToString()
             });
             await itemModel.UseAsync(useContext);
+            _domain.ResolveDeadCards(events);
 
             int usesRemaining = itemCard.GetState("usesRemaining", itemModel.MaxUses) - 1;
             if (usesRemaining <= 0)
@@ -201,6 +202,7 @@ namespace Game.Core.Domain.Actions
                 Reason = relic.Id.ToString()
             });
             await relic.ActivateAsync(relicContext);
+            _domain.ResolveDeadCards(events);
             _domain.Relics.ActiveSlot.MarkActivated(relic.Id);
             await _domain.ProcessLifecycleAsync(events);
             _domain.AppendPlayerDefeatedIfNeeded(events);
