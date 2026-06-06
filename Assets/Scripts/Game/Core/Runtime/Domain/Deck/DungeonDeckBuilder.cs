@@ -41,10 +41,10 @@ namespace Game.Core.Domain.Deck
 
             if (plan.RoomType == RoomType.Restaurant)
             {
-                deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Food, "food", "room"));
+                deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Food, "food", "food"));
                 for (int i = 0; i < 3; i++)
                 {
-                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Mentor, "mentor", "room"));
+                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Mentor, "mentor", "mentor"));
                 }
                 deck.Shuffle(rng);
                 return deck;
@@ -87,24 +87,24 @@ namespace Game.Core.Domain.Deck
             switch (plan.RoomType)
             {
                 case RoomType.Gold:
-                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Gold, "gold", "room"));
+                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Gold, "gold", "gold"));
                     break;
                 case RoomType.Treasure:
                 case RoomType.Chest:
-                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Chest, "chest", "room"));
+                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Chest, "chest", "chest"));
                     break;
                 case RoomType.StatUpgrade:
-                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.StatUpgrade, "stat", "room"));
+                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.StatUpgrade, "stat", "stat"));
                     break;
                 case RoomType.Reward:
-                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Chest, "chest", "room"));
-                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.StatUpgrade, "stat", "room"));
+                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.Chest, "chest", "chest"));
+                    deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.StatUpgrade, "stat", "stat"));
                     break;
                 case RoomType.Shop:
                     int productCount = rng.NextInt(4, 7);
                     for (int i = 0; i < productCount; i++)
                     {
-                        deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.ShopProduct, "shop-product", "room"));
+                        deck.AddToTop(cardFactory.CreateFromCatalogOrFallback(CardType.ShopProduct, "shop-product", "shop-product"));
                     }
                     break;
                 case RoomType.EliteCombat:

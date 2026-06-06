@@ -15,6 +15,7 @@ using Game.Core.Domain.Progression;
 using Game.Core.Domain.Rooms;
 using Game.Core.Models;
 using Game.Core.Random;
+using Game.Core.Rooms;
 
 namespace Game.Core.Domain
 {
@@ -59,6 +60,187 @@ namespace Game.Core.Domain
         public void SetPlayerGold(int value)
         {
             PlayerGold = Math.Max(0, value);
+        }
+
+        public ChoiceSession OpenChoiceSession(string sessionId, CardInstance sourceCard, string choiceKind, IReadOnlyList<string> optionKeys, ICollection<DomainEvent> events)
+        {
+            if (sourceCard == null)
+            {
+                throw new ArgumentNullException(nameof(sourceCard));
+            }
+
+            if (optionKeys == null || optionKeys.Count == 0)
+            {
+                throw new ArgumentException("Choice session must expose at least one option.", nameof(optionKeys));
+            }
+
+            ChoiceSession session = ChoiceSessions.Open(sessionId, optionKeys.Count, choiceKind, sourceCard.InstanceId, optionKeys);
+            events?.Add(new DomainEvent(DomainEventType.ChoiceOpened)
+            {
+                CardId = sourceCard.InstanceId,
+                Amount = optionKeys.Count,
+                Reason = sessionId
+            });
+            return session;
+        }
+
+        public async Task ResolveChoiceSessionAsync(ChoiceSession session, int optionIndex, ICollection<DomainEvent> events)
+        {
+            if (session == null || session.SourceCardId.IsEmpty)
+            {
+                return;
+            }
+
+            if (!Grid.TryGetCard(session.SourceCardId, out CardInstance sourceCard))
+            {
+                return;
+            }
+
+            if (!TryResolveCardModel(sourceCard, out CardModel model))
+            {
+                return;
+            }
+
+            ChoiceResolutionContext context = new ChoiceResolutionContext(this, sourceCard, session, optionIndex, events);
+            await model.OnChoiceResolvedAsync(context).ConfigureAwait(false);
+        }
+
+        public void AddPlayerModifier(StatModifier modifier, ICollection<DomainEvent> events, string reason = null)
+        {
+            PlayerRunState?.AddModifier(modifier);
+            ApplyPlayerRunState(events, reason ?? GetPlayerStatReason(modifier.Stat));
+        }
+
+        public void RemovePlayerModifiersBySource(string source, ICollection<DomainEvent> events, string reason = null)
+        {
+            PlayerRunState?.RemoveModifiersBySource(source);
+            ApplyPlayerRunState(events, reason ?? source);
+        }
+
+        public void SetPlayerKeyword(string keyword, int value, StatModifierScope scope)
+        {
+            PlayerRunState?.SetKeyword(keyword, value, scope);
+        }
+
+        public void RemovePlayerKeyword(string keyword, StatModifierScope scope)
+        {
+            PlayerRunState?.RemoveKeyword(keyword, scope);
+        }
+
+        public void AddPlayerTrait(ModelId traitId, StatModifierScope scope, string source, ICollection<DomainEvent> events)
+        {
+            PlayerRunState?.AddTrait(traitId, scope, source);
+            events?.Add(new DomainEvent(DomainEventType.TraitAcquired)
+            {
+                Reason = traitId.ToString(),
+                Amount = (int)scope
+            });
+        }
+
+        public void RemovePlayerTraitsBySource(string source)
+        {
+            PlayerRunState?.RemoveTraitsBySource(source);
+        }
+
+        public void ApplyPlayerRunState(ICollection<DomainEvent> events, string reason)
+        {
+            CardInstance playerCard = Grid.PlayerCard;
+            if (playerCard == null || PlayerRunState == null)
+            {
+                return;
+            }
+
+            int oldMaxHp = playerCard.MaxHp;
+            int oldAttack = playerCard.Attack;
+            int oldDefense = playerCard.Defense;
+            PlayerRunState.ApplyTo(playerCard);
+
+            AppendPlayerStatChanged(events, PlayerStat.MaxHp, oldMaxHp, playerCard.MaxHp, reason);
+            AppendPlayerStatChanged(events, PlayerStat.Attack, oldAttack, playerCard.Attack, reason);
+            AppendPlayerStatChanged(events, PlayerStat.Defense, oldDefense, playerCard.Defense, reason);
+        }
+
+        public void HealPlayer(int amount, ICollection<DomainEvent> events, string reason)
+        {
+            CardInstance playerCard = Grid.PlayerCard;
+            if (playerCard == null)
+            {
+                return;
+            }
+
+            int before = playerCard.CurrentHp;
+            playerCard.SetCurrentHp(playerCard.CurrentHp + Math.Max(0, amount));
+            int recovered = playerCard.CurrentHp - before;
+            if (recovered > 0)
+            {
+                events?.Add(new DomainEvent(DomainEventType.HealingApplied)
+                {
+                    CardId = playerCard.InstanceId,
+                    Amount = recovered,
+                    SecondaryAmount = playerCard.CurrentHp,
+                    Reason = reason
+                });
+            }
+        }
+
+        public void RestorePlayerToFull(ICollection<DomainEvent> events, string reason)
+        {
+            CardInstance playerCard = Grid.PlayerCard;
+            if (playerCard == null)
+            {
+                return;
+            }
+
+            int missing = playerCard.MaxHp - playerCard.CurrentHp;
+            if (missing > 0)
+            {
+                HealPlayer(missing, events, reason);
+            }
+        }
+
+        public ModelId AcquireRelic(RelicModel relic, ICollection<DomainEvent> events)
+        {
+            if (relic == null)
+            {
+                throw new ArgumentNullException(nameof(relic));
+            }
+
+            if (relic.Kind == RelicKind.Active)
+            {
+                ModelId replacedActive = default;
+                if (!Relics.ActiveSlot.IsEmpty && !Relics.ActiveSlot.Contains(relic.Id))
+                {
+                    replacedActive = Relics.ActiveSlot.RelicId;
+                    RemoveRelicBonuses(replacedActive, events);
+                    Relics.ActiveSlot.Clear();
+                }
+
+                if (!Relics.ActiveSlot.Contains(relic.Id))
+                {
+                    Relics.ActiveSlot.Assign(relic.Id, relic.MaxUsesPerRoom);
+                    ApplyRelicBonuses(relic, events);
+                }
+
+                events?.Add(new DomainEvent(DomainEventType.RelicAcquired)
+                {
+                    Reason = relic.Id.ToString(),
+                    Amount = (int)relic.Kind
+                });
+                return replacedActive;
+            }
+
+            if (!Relics.Contains(relic.Id))
+            {
+                Relics.AddPassive(relic.Id);
+                ApplyRelicBonuses(relic, events);
+                events?.Add(new DomainEvent(DomainEventType.RelicAcquired)
+                {
+                    Reason = relic.Id.ToString(),
+                    Amount = (int)relic.Kind
+                });
+            }
+
+            return default;
         }
 
         private static PlayerRunState CreateInitialPlayerRunState(GridState grid)
@@ -176,6 +358,8 @@ namespace Game.Core.Domain
                 await NotifyCardTraitHooksAsync(card, trait => trait.OnPlayerActionCommittedAsync(context));
             }
 
+            await NotifyPlayerTraitHooksAsync(trait => trait.OnPlayerActionCommittedAsync(new PlayerActionContext(this, Grid.PlayerCard, sourceIntent, actionIndex, events))).ConfigureAwait(false);
+
             await DispatchDuePendingTriggersAsync(sourceIntent, actionIndex, events).ConfigureAwait(false);
         }
 
@@ -275,7 +459,33 @@ namespace Game.Core.Domain
                         CardDestroyedContext context = new CardDestroyedContext(this, removedCard, domainEvent.Reason, events);
                         await removedModel.OnDestroyedAsync(context);
                         await NotifyCardTraitHooksAsync(removedCard, trait => trait.OnCardRemovedAsync(context));
+                        await NotifyFaceUpObserverTraitsAsync(removedCard.InstanceId, trait => trait.OnCardRemovedAsync(context)).ConfigureAwait(false);
+                        await NotifyPlayerTraitHooksAsync(trait => trait.OnCardRemovedAsync(context)).ConfigureAwait(false);
                     }
+                }
+                else if (domainEvent.EventType == DomainEventType.MonsterDefeated)
+                {
+                    if (Grid.TryGetCard(domainEvent.CardId, out CardInstance defeatedMonster))
+                    {
+                        MonsterDefeatedContext context = new MonsterDefeatedContext(
+                            this,
+                            defeatedMonster,
+                            defeatedMonster.GetState("elite", 0) > 0,
+                            defeatedMonster.GetState("boss", 0) > 0,
+                            events);
+
+                        await NotifyRelicHooksAsync(relic => relic.OnMonsterDefeatedAsync(context)).ConfigureAwait(false);
+                        await NotifyPlayerTraitHooksAsync(trait => trait.OnMonsterDefeatedAsync(context)).ConfigureAwait(false);
+
+                        if (context.WasElite || context.WasBoss)
+                        {
+                            await NotifyRelicHooksAsync(relic => relic.OnEliteOrBossDefeatedAsync(context)).ConfigureAwait(false);
+                        }
+                    }
+                }
+                else if (domainEvent.EventType == DomainEventType.RoomCleared)
+                {
+                    await NotifyRoomClearedAsync(events).ConfigureAwait(false);
                 }
             }
         }
@@ -334,6 +544,29 @@ namespace Game.Core.Domain
             });
         }
 
+        public bool TrySpendGold(int amount, ICollection<DomainEvent> events, string reason)
+        {
+            int cost = Math.Max(0, amount);
+            if (cost == 0)
+            {
+                return true;
+            }
+
+            if (PlayerGold < cost)
+            {
+                return false;
+            }
+
+            PlayerGold -= cost;
+            events?.Add(new DomainEvent(DomainEventType.GoldChanged)
+            {
+                Amount = -cost,
+                SecondaryAmount = PlayerGold,
+                Reason = reason
+            });
+            return true;
+        }
+
         #region Combat Hooks
 
         public async Task NotifyBeforeDamageAsync(DamageContext ctx)
@@ -346,6 +579,10 @@ namespace Game.Core.Domain
             await NotifyRelicHooksAsync(r => r.OnBeforeDamageAsync(ctx)).ConfigureAwait(false);
             await NotifyCardTraitHooksAsync(ctx.SourceCard, t => t.OnBeforeDamageAsync(ctx)).ConfigureAwait(false);
             await NotifyCardTraitHooksAsync(ctx.TargetCard, t => t.OnBeforeDamageAsync(ctx)).ConfigureAwait(false);
+            if (ctx.SourceCard?.CardType == CardType.Player || ctx.TargetCard?.CardType == CardType.Player)
+            {
+                await NotifyPlayerTraitHooksAsync(t => t.OnBeforeDamageAsync(ctx)).ConfigureAwait(false);
+            }
         }
 
         public async Task NotifyAfterDamageAsync(DamageContext ctx, DamageResult result)
@@ -360,6 +597,10 @@ namespace Game.Core.Domain
             await NotifyCardModelHookAsync(ctx.TargetCard, m => m.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
             await NotifyCardTraitHooksAsync(ctx.SourceCard, t => t.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
             await NotifyCardTraitHooksAsync(ctx.TargetCard, t => t.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
+            if (ctx.SourceCard?.CardType == CardType.Player || ctx.TargetCard?.CardType == CardType.Player)
+            {
+                await NotifyPlayerTraitHooksAsync(t => t.OnAfterDamageAsync(ctx, result)).ConfigureAwait(false);
+            }
         }
 
         public async Task<int> ModifyDamageDealtAsync(DamageContext ctx, int current)
@@ -382,6 +623,25 @@ namespace Game.Core.Domain
             if (ctx.SourceCard != null)
             {
                 value = ModifyDamageByCardTraits(ctx.SourceCard, t => t.ModifyDamageDealt(ctx, value), value);
+                if (ctx.SourceCard.CardType == CardType.Player)
+                {
+                    value = ModifyDamageByPlayerTraits(t => t.ModifyDamageDealt(ctx, value), value);
+                }
+            }
+
+            foreach (CardInstance card in Grid.AllGridCards)
+            {
+                if (card.CardType == CardType.Player || !card.IsFaceUp)
+                {
+                    continue;
+                }
+
+                if (card.InstanceId == ctx.SourceCard?.InstanceId || card.InstanceId == ctx.TargetCard?.InstanceId)
+                {
+                    continue;
+                }
+
+                value = ModifyDamageByCardTraits(card, t => t.ModifyDamageDealt(ctx, value), value);
             }
 
             return value;
@@ -407,6 +667,10 @@ namespace Game.Core.Domain
             if (ctx.TargetCard != null)
             {
                 value = ModifyDamageByCardTraits(ctx.TargetCard, t => t.ModifyDamageTaken(ctx, value), value);
+                if (ctx.TargetCard.CardType == CardType.Player)
+                {
+                    value = ModifyDamageByPlayerTraits(t => t.ModifyDamageTaken(ctx, value), value);
+                }
             }
 
             // Notify field observers (face-up monsters/traps) — ordered by cell index, top-first
@@ -436,6 +700,57 @@ namespace Game.Core.Domain
                 {
                     await notify(relic).ConfigureAwait(false);
                 }
+            }
+        }
+
+        public async Task NotifyRoomEnteredAsync(ICollection<DomainEvent> events)
+        {
+            RoomLifecycleContext context = CreateRoomLifecycleContext(events);
+            await NotifyRelicHooksAsync(relic => relic.OnRoomEnteredAsync(context)).ConfigureAwait(false);
+            await NotifyPlayerTraitHooksAsync(trait => trait.OnRoomEnteredAsync(context)).ConfigureAwait(false);
+        }
+
+        private async Task NotifyRoomClearedAsync(ICollection<DomainEvent> events)
+        {
+            RoomLifecycleContext context = CreateRoomLifecycleContext(events);
+            await NotifyRelicHooksAsync(relic => relic.OnRoomClearedAsync(context)).ConfigureAwait(false);
+            await NotifyPlayerTraitHooksAsync(trait => trait.OnRoomClearedAsync(context)).ConfigureAwait(false);
+        }
+
+        private RoomLifecycleContext CreateRoomLifecycleContext(ICollection<DomainEvent> events)
+        {
+            RoomType roomType = Progression != null ? Progression.CurrentRoomType : RoomType.Combat;
+            int layerIndex = Progression != null ? Progression.LayerIndex : 0;
+            int nodeIndex = Progression != null ? Progression.NodeIndex : 0;
+            return new RoomLifecycleContext(this, roomType, layerIndex, nodeIndex, events ?? new List<DomainEvent>());
+        }
+
+        private async Task NotifyPlayerTraitHooksAsync(Func<TraitModel, Task> notify)
+        {
+            if (PlayerRunState == null)
+            {
+                return;
+            }
+
+            foreach (PlayerTraitState traitState in PlayerRunState.Traits)
+            {
+                if (ModelDb.TryGet(traitState.TraitId, out TraitModel trait))
+                {
+                    await notify(trait).ConfigureAwait(false);
+                }
+            }
+        }
+
+        private async Task NotifyFaceUpObserverTraitsAsync(CardInstanceId excludedCardId, Func<TraitModel, Task> notify)
+        {
+            foreach (CardInstance card in Grid.AllGridCards)
+            {
+                if (!card.IsFaceUp || card.CardType == CardType.Player || card.InstanceId == excludedCardId)
+                {
+                    continue;
+                }
+
+                await NotifyCardTraitHooksAsync(card, notify).ConfigureAwait(false);
             }
         }
 
@@ -494,6 +809,90 @@ namespace Game.Core.Domain
             }
 
             return value;
+        }
+
+        private int ModifyDamageByPlayerTraits(Func<TraitModel, int> modify, int current)
+        {
+            if (PlayerRunState == null)
+            {
+                return current;
+            }
+
+            int value = current;
+            foreach (PlayerTraitState traitState in PlayerRunState.Traits)
+            {
+                if (ModelDb.TryGet(traitState.TraitId, out TraitModel trait))
+                {
+                    value = modify(trait);
+                }
+            }
+
+            return value;
+        }
+
+        private void ApplyRelicBonuses(RelicModel relic, ICollection<DomainEvent> events)
+        {
+            string source = GetRelicBonusSource(relic.Id);
+            PlayerRunState?.RemoveModifiersBySource(source);
+
+            if (relic.AttackBonus != 0)
+            {
+                PlayerRunState?.AddModifier(new StatModifier(PlayerStat.Attack, StatModifierScope.Permanent, relic.AttackBonus, source));
+            }
+
+            if (relic.DefenseBonus != 0)
+            {
+                PlayerRunState?.AddModifier(new StatModifier(PlayerStat.Defense, StatModifierScope.Permanent, relic.DefenseBonus, source));
+            }
+
+            if (relic.MaxHpBonus != 0)
+            {
+                PlayerRunState?.AddModifier(new StatModifier(PlayerStat.MaxHp, StatModifierScope.Permanent, relic.MaxHpBonus, source));
+            }
+
+            ApplyPlayerRunState(events, source);
+            if (relic.MaxHpBonus > 0)
+            {
+                HealPlayer(relic.MaxHpBonus, events, source + ":heal");
+            }
+        }
+
+        private void RemoveRelicBonuses(ModelId relicId, ICollection<DomainEvent> events)
+        {
+            PlayerRunState?.RemoveModifiersBySource(GetRelicBonusSource(relicId));
+            ApplyPlayerRunState(events, GetRelicBonusSource(relicId));
+        }
+
+        private void AppendPlayerStatChanged(ICollection<DomainEvent> events, PlayerStat stat, int previousValue, int currentValue, string reason)
+        {
+            if (events == null || previousValue == currentValue)
+            {
+                return;
+            }
+
+            events.Add(new DomainEvent(DomainEventType.StatChanged)
+            {
+                CardId = Grid.PlayerCard != null ? Grid.PlayerCard.InstanceId : default,
+                Amount = currentValue - previousValue,
+                SecondaryAmount = currentValue,
+                Reason = string.IsNullOrWhiteSpace(reason) ? GetPlayerStatReason(stat) : reason
+            });
+        }
+
+        private static string GetPlayerStatReason(PlayerStat stat)
+        {
+            return stat switch
+            {
+                PlayerStat.MaxHp => "player:max-hp",
+                PlayerStat.Attack => "player:attack",
+                PlayerStat.Defense => "player:defense",
+                _ => "player:stat"
+            };
+        }
+
+        private static string GetRelicBonusSource(ModelId relicId)
+        {
+            return "relic:" + relicId;
         }
 
         private static IReadOnlyList<ModelId> GetTraitIdsFromModel(CardModel model)

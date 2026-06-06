@@ -194,16 +194,6 @@ namespace Game.Core.Domain.Rooms
             newPlayerCard.SetCurrentHp(playerHp);
             newGrid.AddCardToGrid(newPlayerCard, playerStart, true);
 
-            // Deal dungeon deck onto new grid
-            DealPolicy dealPolicy = nextRoomType == RoomType.Restaurant
-                ? DealPolicy.RestaurantDefault()
-                : DealPolicy.CombatDefault();
-
-            if (newDeck.Count > 0)
-            {
-                _gridDealer.Deal(newGrid, newDeck, dealPolicy, rng);
-            }
-
             // Replace domain state
             domain.ReplaceGrid(newGrid);
             domain.DungeonDeck = newDeck;
@@ -214,6 +204,18 @@ namespace Game.Core.Domain.Rooms
                 nextNodeIndex,
                 nextRoomType,
                 Array.Empty<RoomType>());
+
+            domain.NotifyRoomEnteredAsync(events).GetAwaiter().GetResult();
+
+            // Deal dungeon deck onto new grid after room-entry hooks can mutate the deck.
+            DealPolicy dealPolicy = nextRoomType == RoomType.Restaurant
+                ? DealPolicy.RestaurantDefault()
+                : DealPolicy.CombatDefault();
+
+            if (newDeck.Count > 0)
+            {
+                _gridDealer.Deal(newGrid, newDeck, dealPolicy, rng);
+            }
 
             events.Add(new DomainEvent(DomainEventType.RoomEntered)
             {

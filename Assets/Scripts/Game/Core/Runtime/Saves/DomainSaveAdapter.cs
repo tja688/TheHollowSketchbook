@@ -285,6 +285,8 @@ namespace Game.Core.Saves
                     SessionId = session.SessionId,
                     OptionCount = session.OptionCount,
                     ChoiceKind = session.ChoiceKind,
+                    SourceCardInstanceId = session.SourceCardId.Value,
+                    OptionKeys = new List<string>(session.OptionKeys),
                     IsResolved = session.IsResolved,
                     SelectedOptionIndex = session.SelectedOptionIndex
                 });
@@ -331,6 +333,17 @@ namespace Game.Core.Saves
                     Scope = (int)modifier.Scope,
                     Amount = modifier.Amount,
                     Source = modifier.Source
+                });
+            }
+
+            foreach (PlayerTraitState trait in state.Traits)
+            {
+                dto.Traits.Add(new PlayerTraitStateSaveDto
+                {
+                    Category = trait.TraitId.Category,
+                    Entry = trait.TraitId.Entry,
+                    Scope = (int)trait.Scope,
+                    Source = trait.Source
                 });
             }
 
@@ -508,7 +521,14 @@ namespace Game.Core.Saves
             for (int i = 0; i < dtos.Count; i++)
             {
                 ChoiceSessionSaveDto dto = dtos[i];
-                store.Restore(dto.SessionId, dto.OptionCount, dto.ChoiceKind, dto.IsResolved, dto.SelectedOptionIndex);
+                store.Restore(
+                    dto.SessionId,
+                    dto.OptionCount,
+                    dto.ChoiceKind,
+                    dto.IsResolved,
+                    dto.SelectedOptionIndex,
+                    new CardInstanceId(dto.SourceCardInstanceId),
+                    dto.OptionKeys);
             }
         }
 
@@ -545,6 +565,14 @@ namespace Game.Core.Saves
                 foreach (StatModifierSaveDto modifier in dto.Modifiers)
                 {
                     state.AddModifier(new StatModifier((PlayerStat)modifier.Stat, (StatModifierScope)modifier.Scope, modifier.Amount, modifier.Source));
+                }
+            }
+
+            if (dto.Traits != null)
+            {
+                foreach (PlayerTraitStateSaveDto trait in dto.Traits)
+                {
+                    state.AddTrait(new ModelId(trait.Category, trait.Entry), (StatModifierScope)trait.Scope, trait.Source);
                 }
             }
 

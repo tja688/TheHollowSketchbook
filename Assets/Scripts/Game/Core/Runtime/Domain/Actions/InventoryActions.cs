@@ -110,6 +110,12 @@ namespace Game.Core.Domain.Actions
             await itemModel.UseAsync(useContext);
             _domain.ResolveDeadCards(events);
 
+            bool roomCleared = _domain.RoomClearChecker.IsRoomCleared(_domain.Grid);
+            if (roomCleared)
+            {
+                events.Add(new DomainEvent(DomainEventType.RoomCleared));
+            }
+
             int usesRemaining = itemCard.GetState("usesRemaining", itemModel.MaxUses) - 1;
             if (usesRemaining <= 0)
             {
@@ -138,10 +144,8 @@ namespace Game.Core.Domain.Actions
 
             await _domain.ProcessLifecycleAsync(events);
             _domain.AppendPlayerDefeatedIfNeeded(events);
-            if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))
+            if (roomCleared)
             {
-                events.Add(new DomainEvent(DomainEventType.RoomCleared));
-
                 if (_domain.RoomTransition != null && _domain.Rng != null)
                 {
                     List<DomainEvent> routeEvents = _domain.RoomTransition.GenerateAndPlaceRouteCards(_domain, _domain.Rng);
@@ -204,12 +208,17 @@ namespace Game.Core.Domain.Actions
             await relic.ActivateAsync(relicContext);
             _domain.ResolveDeadCards(events);
             _domain.Relics.ActiveSlot.MarkActivated(relic.Id);
-            await _domain.ProcessLifecycleAsync(events);
-            _domain.AppendPlayerDefeatedIfNeeded(events);
-            if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))
+
+            bool roomCleared = _domain.RoomClearChecker.IsRoomCleared(_domain.Grid);
+            if (roomCleared)
             {
                 events.Add(new DomainEvent(DomainEventType.RoomCleared));
+            }
 
+            await _domain.ProcessLifecycleAsync(events);
+            _domain.AppendPlayerDefeatedIfNeeded(events);
+            if (roomCleared)
+            {
                 if (_domain.RoomTransition != null && _domain.Rng != null)
                 {
                     List<DomainEvent> routeEvents = _domain.RoomTransition.GenerateAndPlaceRouteCards(_domain, _domain.Rng);

@@ -95,6 +95,7 @@ namespace Game.Core.Domain
             context.RoomTransition = _transitionService;
             context.Progression = new RunProgressionState(
                 1, 1, firstPlan.RoomType, Array.Empty<RoomType>());
+            context.NotifyRoomEnteredAsync(new List<DomainEvent>()).GetAwaiter().GetResult();
 
             return context;
         }

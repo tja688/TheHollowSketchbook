@@ -81,6 +81,8 @@ namespace Game.Core.Saves
         public string SessionId;
         public int OptionCount;
         public string ChoiceKind;
+        public uint SourceCardInstanceId;
+        public List<string> OptionKeys = new List<string>();
         public bool IsResolved;
         public int SelectedOptionIndex = -1;
     }
@@ -112,12 +114,22 @@ namespace Game.Core.Saves
     }
 
     [Serializable]
+    public sealed class PlayerTraitStateSaveDto
+    {
+        public string Category;
+        public string Entry;
+        public int Scope;
+        public string Source;
+    }
+
+    [Serializable]
     public sealed class PlayerRunStateSaveDto
     {
         public int BaseMaxHp;
         public int BaseAttack;
         public int BaseDefense;
         public List<StatModifierSaveDto> Modifiers = new List<StatModifierSaveDto>();
+        public List<PlayerTraitStateSaveDto> Traits = new List<PlayerTraitStateSaveDto>();
         public List<KeywordStateSaveDto> Keywords = new List<KeywordStateSaveDto>();
     }
 

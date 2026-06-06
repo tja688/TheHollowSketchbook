@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Game.Core;
 using Game.Core.Domain.Cards;
 
 namespace Game.Core.Domain.Progression
@@ -34,9 +35,24 @@ namespace Game.Core.Domain.Progression
         public string Source { get; }
     }
 
+    public sealed class PlayerTraitState
+    {
+        public PlayerTraitState(ModelId traitId, StatModifierScope scope, string source)
+        {
+            TraitId = traitId;
+            Scope = scope;
+            Source = source ?? string.Empty;
+        }
+
+        public ModelId TraitId { get; }
+        public StatModifierScope Scope { get; }
+        public string Source { get; }
+    }
+
     public sealed class PlayerRunState
     {
         private readonly List<StatModifier> _modifiers = new List<StatModifier>();
+        private readonly List<PlayerTraitState> _traits = new List<PlayerTraitState>();
         private readonly Dictionary<string, int> _permanentKeywords = new Dictionary<string, int>();
         private readonly Dictionary<string, int> _roomKeywords = new Dictionary<string, int>();
 
@@ -56,8 +72,11 @@ namespace Game.Core.Domain.Progression
         public int CurrentDefense => Math.Max(0, BaseDefense + Sum(PlayerStat.Defense));
 
         public IReadOnlyList<StatModifier> Modifiers => _modifiers;
+        public IReadOnlyList<PlayerTraitState> Traits => _traits;
         public IReadOnlyDictionary<string, int> PermanentKeywords => _permanentKeywords;
         public IReadOnlyDictionary<string, int> RoomKeywords => _roomKeywords;
+        public IEnumerable<PlayerTraitState> PermanentTraits => _traits.Where(trait => trait.Scope == StatModifierScope.Permanent);
+        public IEnumerable<PlayerTraitState> RoomTraits => _traits.Where(trait => trait.Scope == StatModifierScope.Room);
 
         public void AddModifier(StatModifier modifier)
         {
@@ -80,6 +99,57 @@ namespace Game.Core.Domain.Progression
             target[keyword] = value;
         }
 
+        public void RemoveKeyword(string keyword, StatModifierScope scope)
+        {
+            if (string.IsNullOrWhiteSpace(keyword))
+            {
+                return;
+            }
+
+            Dictionary<string, int> target = scope == StatModifierScope.Room ? _roomKeywords : _permanentKeywords;
+            target.Remove(keyword);
+        }
+
+        public void AddTrait(ModelId traitId, StatModifierScope scope, string source)
+        {
+            if (traitId.IsEmpty)
+            {
+                throw new ArgumentException("Trait id cannot be empty.", nameof(traitId));
+            }
+
+            if (_traits.Any(trait => trait.Scope == scope && trait.TraitId == traitId))
+            {
+                return;
+            }
+
+            _traits.Add(new PlayerTraitState(traitId, scope, source));
+        }
+
+        public void RemoveTraitsBySource(string source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return;
+            }
+
+            _traits.RemoveAll(trait => string.Equals(trait.Source, source, StringComparison.Ordinal));
+        }
+
+        public void RemoveTrait(ModelId traitId, StatModifierScope? scope = null)
+        {
+            _traits.RemoveAll(trait => trait.TraitId == traitId && (!scope.HasValue || trait.Scope == scope.Value));
+        }
+
+        public void RemoveModifiersBySource(string source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return;
+            }
+
+            _modifiers.RemoveAll(modifier => string.Equals(modifier.Source, source, StringComparison.Ordinal));
+        }
+
         public int GetKeyword(string keyword)
         {
             if (string.IsNullOrWhiteSpace(keyword))
@@ -98,6 +168,7 @@ namespace Game.Core.Domain.Progression
         public void ClearRoomState()
         {
             _modifiers.RemoveAll(modifier => modifier.Scope == StatModifierScope.Room);
+            _traits.RemoveAll(trait => trait.Scope == StatModifierScope.Room);
             _roomKeywords.Clear();
         }
 

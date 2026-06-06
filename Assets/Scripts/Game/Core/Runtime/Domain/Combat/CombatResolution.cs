@@ -44,7 +44,7 @@ namespace Game.Core.Domain.Combat
             }
 
             _grid.TryGetCard(info.Source.CardId, out CardInstance sourceCard);
-            DamageContext damageCtx = new DamageContext(info, sourceCard, target, Domain);
+            DamageContext damageCtx = new DamageContext(info, sourceCard, target, Domain, events);
 
             // Phase 1: BeforeDamage hooks
             await NotifyBeforeDamageAsync(damageCtx).ConfigureAwait(false);
@@ -233,9 +233,21 @@ namespace Game.Core.Domain.Combat
             return await Domain.ModifyDamageTakenAsync(ctx, current).ConfigureAwait(false);
         }
 
-        private static bool HasFirstStrike(CardInstance card)
+        private bool HasFirstStrike(CardInstance card)
         {
-            return card.GetState("firstStrike", 0) > 0;
+            if (card == null)
+            {
+                return false;
+            }
+
+            if (card.GetState("firstStrike", 0) > 0)
+            {
+                return true;
+            }
+
+            return card.CardType == CardType.Player
+                && Domain?.PlayerRunState != null
+                && Domain.PlayerRunState.GetKeyword("firstStrike") > 0;
         }
     }
 }

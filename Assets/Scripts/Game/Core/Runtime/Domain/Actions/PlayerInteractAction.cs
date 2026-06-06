@@ -57,15 +57,17 @@ namespace Game.Core.Domain.Actions
             events.Add(_domain.ActionCounter.Increment(_intent));
             await _domain.NotifyAfterPlayerActionCommittedAsync(_intent, events);
             _domain.ResolveDeadCards(events);
-            await _domain.ProcessLifecycleAsync(events);
-            _domain.AppendPlayerDefeatedIfNeeded(events);
 
             bool roomCleared = _domain.RoomClearChecker.IsRoomCleared(_domain.Grid);
             if (roomCleared)
             {
                 events.Add(new DomainEvent(DomainEventType.RoomCleared));
+            }
 
-                // Generate route choice cards after room clear
+            await _domain.ProcessLifecycleAsync(events);
+            _domain.AppendPlayerDefeatedIfNeeded(events);
+            if (roomCleared)
+            {
                 if (_domain.RoomTransition != null && _domain.Rng != null)
                 {
                     List<DomainEvent> routeEvents = _domain.RoomTransition.GenerateAndPlaceRouteCards(_domain, _domain.Rng);

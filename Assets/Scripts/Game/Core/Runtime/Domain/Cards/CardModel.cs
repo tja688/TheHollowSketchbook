@@ -69,6 +69,11 @@ namespace Game.Core.Domain.Cards
             return Task.CompletedTask;
         }
 
+        public virtual Task OnChoiceResolvedAsync(ChoiceResolutionContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
         public virtual CardInstance CreateInstance(CardInstanceId id)
         {
             CardInstance instance = new CardInstance(id, Id, CardType);

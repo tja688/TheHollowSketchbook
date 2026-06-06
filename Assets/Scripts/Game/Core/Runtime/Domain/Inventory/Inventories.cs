@@ -53,6 +53,8 @@ namespace Game.Core.Domain.Inventory
 
     public sealed class PlayerInventory
     {
+        public const int DefaultCapacity = 2;
+
         private readonly List<CardInstance> _items = new List<CardInstance>();
         private readonly IReadOnlyList<CardInstance> _itemView;
 
@@ -69,6 +71,16 @@ namespace Game.Core.Domain.Inventory
         public int Count
         {
             get { return _items.Count; }
+        }
+
+        public int Capacity
+        {
+            get { return DefaultCapacity; }
+        }
+
+        public bool HasSpace
+        {
+            get { return _items.Count < Capacity; }
         }
 
         public bool Contains(CardInstanceId cardId)
@@ -94,6 +106,11 @@ namespace Game.Core.Domain.Inventory
             if (item.CardType != CardType.Item)
             {
                 throw new InvalidOperationException("Only item cards can be stored in player inventory.");
+            }
+
+             if (!HasSpace)
+            {
+                throw new InvalidOperationException("Player inventory is full.");
             }
 
             item.Zone = CardZone.PlayerInventory;

@@ -164,6 +164,11 @@ namespace Game.Core.Domain.Interaction
                     return IntentValidationResult.Invalid("TargetCannotBeStored");
                 }
 
+                if (!_domain.ItemInventory.HasSpace)
+                {
+                    return IntentValidationResult.Invalid("InventoryFull");
+                }
+
                 return IntentValidationResult.Valid();
             }
 
@@ -246,6 +251,12 @@ namespace Game.Core.Domain.Interaction
                     return IntentValidationResult.Invalid("RelicNotEquipped");
                 }
 
+                IntentValidationResult relicTargetValidation = ValidateRelicTarget(relic.TargetMode, activateRelicIntent.Target);
+                if (!relicTargetValidation.IsValid)
+                {
+                    return relicTargetValidation;
+                }
+
                 ActiveRelicContext relicContext = new ActiveRelicContext(_domain, relic, _domain.Relics.ActiveSlot, activateRelicIntent, Array.Empty<Game.Core.Domain.Events.DomainEvent>());
                 if (!relic.CanActivate(relicContext))
                 {
@@ -268,9 +279,9 @@ namespace Game.Core.Domain.Interaction
                 case ItemTargetMode.GridCell:
                     return ValidateGridCell(target);
                 case ItemTargetMode.MonsterCard:
-                    return ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, true);
+                    return ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, true, true);
                 case ItemTargetMode.CardThenDirection:
-                    IntentValidationResult cardResult = ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, false);
+                    IntentValidationResult cardResult = ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, false, true);
                     if (!cardResult.IsValid)
                     {
                         return cardResult;
@@ -278,13 +289,13 @@ namespace Game.Core.Domain.Interaction
 
                     return target.HasDirection ? IntentValidationResult.Valid() : IntentValidationResult.Invalid("ItemTargetDirectionMissing");
                 case ItemTargetMode.TwoCards:
-                    IntentValidationResult firstCard = ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, false);
+                    IntentValidationResult firstCard = ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, false, false);
                     if (!firstCard.IsValid)
                     {
                         return firstCard;
                     }
 
-                    IntentValidationResult secondCard = ValidateTargetCard(target.SecondaryCard, target.HasSecondaryCard, false);
+                    IntentValidationResult secondCard = ValidateTargetCard(target.SecondaryCard, target.HasSecondaryCard, false, false);
                     if (!secondCard.IsValid)
                     {
                         return secondCard;
@@ -292,9 +303,9 @@ namespace Game.Core.Domain.Interaction
 
                     return target.PrimaryCard != target.SecondaryCard ? IntentValidationResult.Valid() : IntentValidationResult.Invalid("ItemTargetsMustDiffer");
                 case ItemTargetMode.AnyCard:
-                    return ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, false);
+                    return ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, false, true);
                 case ItemTargetMode.AnyCardThenAnyCell:
-                    IntentValidationResult anyCard = ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, false);
+                    IntentValidationResult anyCard = ValidateTargetCard(target.PrimaryCard, target.HasPrimaryCard, false, true);
                     if (!anyCard.IsValid)
                     {
                         return anyCard;
@@ -316,7 +327,28 @@ namespace Game.Core.Domain.Interaction
             return target.GridCell.IsValid ? IntentValidationResult.Valid() : IntentValidationResult.Invalid("InvalidCoord");
         }
 
-        private IntentValidationResult ValidateTargetCard(CardInstanceId cardId, bool hasCard, bool requireMonster)
+        private IntentValidationResult ValidateRelicTarget(ItemTargetMode mode, ItemTargetSelection target)
+        {
+            if (mode == ItemTargetMode.None || mode == ItemTargetMode.Player)
+            {
+                return IntentValidationResult.Valid();
+            }
+
+            if (!target.HasPrimaryCard && !target.HasGridCell)
+            {
+                return IntentValidationResult.Invalid("RelicTargetMissing");
+            }
+
+            IntentValidationResult result = ValidateItemTarget(mode, target);
+            if (!result.IsValid && result.FailureCode.Contains("Missing"))
+            {
+                return IntentValidationResult.Invalid("RelicTargetMissing");
+            }
+
+            return result;
+        }
+
+        private IntentValidationResult ValidateTargetCard(CardInstanceId cardId, bool hasCard, bool requireMonster, bool requireFaceUp)
         {
             if (!hasCard || cardId.IsEmpty)
             {
@@ -338,7 +370,7 @@ namespace Game.Core.Domain.Interaction
                 return IntentValidationResult.Invalid("TargetNotTopCard");
             }
 
-            if (!target.IsFaceUp)
+            if (requireFaceUp && !target.IsFaceUp)
             {
                 return IntentValidationResult.Invalid("TargetFaceDown");
             }

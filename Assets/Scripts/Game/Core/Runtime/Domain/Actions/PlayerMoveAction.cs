@@ -37,11 +37,21 @@ namespace Game.Core.Domain.Actions
                 GridOperationResult reveal = _domain.Grid.RevealAround(_intent.To, FlipReason.PlayerAdjacentReveal);
                 events.AddRange(reveal.Events);
                 ctx.EnqueueFollowUpActions(reveal.FollowUpActions);
-                await _domain.ProcessLifecycleAsync(events);
-                _domain.AppendPlayerDefeatedIfNeeded(events);
-                if (_domain.RoomClearChecker.IsRoomCleared(_domain.Grid))
+
+                bool roomCleared = _domain.RoomClearChecker.IsRoomCleared(_domain.Grid);
+                if (roomCleared)
                 {
                     events.Add(new DomainEvent(DomainEventType.RoomCleared));
+                }
+
+                await _domain.ProcessLifecycleAsync(events);
+                _domain.AppendPlayerDefeatedIfNeeded(events);
+                if (roomCleared)
+                {
+                    if (_domain.RoomTransition != null && _domain.Rng != null)
+                    {
+                        events.AddRange(_domain.RoomTransition.GenerateAndPlaceRouteCards(_domain, _domain.Rng));
+                    }
                 }
             }
 

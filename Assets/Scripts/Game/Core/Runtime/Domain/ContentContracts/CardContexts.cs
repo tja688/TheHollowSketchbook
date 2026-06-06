@@ -8,6 +8,7 @@ using Game.Core.Domain.Grid;
 using Game.Core.Domain.Interaction;
 using Game.Core.Domain.Inventory;
 using Game.Core.Domain.Progression;
+using Game.Core.Rooms;
 
 namespace Game.Core.Domain.ContentContracts
 {
@@ -191,6 +192,99 @@ namespace Game.Core.Domain.ContentContracts
 
         public InventorySlot Slot { get; }
         public PlayerIntent SourceIntent { get; }
+    }
+
+    public sealed class ChoiceResolutionContext : DomainCallbackContext
+    {
+        public ChoiceResolutionContext(DomainActionContext domain, CardInstance sourceCard, ChoiceSession session, int selectedOptionIndex, ICollection<DomainEvent> events)
+            : base(domain, sourceCard, events)
+        {
+            Session = session ?? throw new ArgumentNullException(nameof(session));
+            SelectedOptionIndex = selectedOptionIndex;
+        }
+
+        public CardInstance SourceCard
+        {
+            get { return Card; }
+        }
+
+        public ChoiceSession Session { get; }
+        public int SelectedOptionIndex { get; }
+
+        public string SelectedOptionKey
+        {
+            get { return Session.GetOptionKey(SelectedOptionIndex); }
+        }
+    }
+
+    public sealed class RoomLifecycleContext
+    {
+        public RoomLifecycleContext(DomainActionContext domain, RoomType roomType, int layerIndex, int nodeIndex, ICollection<DomainEvent> events)
+        {
+            Domain = domain ?? throw new ArgumentNullException(nameof(domain));
+            RoomType = roomType;
+            LayerIndex = layerIndex;
+            NodeIndex = nodeIndex;
+            Events = events ?? throw new ArgumentNullException(nameof(events));
+        }
+
+        public DomainActionContext Domain { get; }
+        public RoomType RoomType { get; }
+        public int LayerIndex { get; }
+        public int NodeIndex { get; }
+        public ICollection<DomainEvent> Events { get; }
+
+        public CardInstance PlayerCard
+        {
+            get { return Domain.Grid.PlayerCard; }
+        }
+
+        public void AddEvent(DomainEvent domainEvent)
+        {
+            if (domainEvent != null)
+            {
+                Events.Add(domainEvent);
+            }
+        }
+
+        public void AddEvents(IEnumerable<DomainEvent> events)
+        {
+            if (events == null)
+            {
+                return;
+            }
+
+            foreach (DomainEvent domainEvent in events)
+            {
+                AddEvent(domainEvent);
+            }
+        }
+
+        public void AddResult(GridOperationResult result)
+        {
+            if (result != null)
+            {
+                AddEvents(result.Events);
+            }
+        }
+    }
+
+    public sealed class MonsterDefeatedContext : DomainCallbackContext
+    {
+        public MonsterDefeatedContext(DomainActionContext domain, CardInstance defeatedMonster, bool wasElite, bool wasBoss, ICollection<DomainEvent> events)
+            : base(domain, defeatedMonster, events)
+        {
+            WasElite = wasElite;
+            WasBoss = wasBoss;
+        }
+
+        public CardInstance DefeatedMonster
+        {
+            get { return Card; }
+        }
+
+        public bool WasElite { get; }
+        public bool WasBoss { get; }
     }
 
     public sealed class ActiveRelicContext

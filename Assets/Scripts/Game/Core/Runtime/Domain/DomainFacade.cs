@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Game.Core.Actions;
@@ -76,12 +77,20 @@ namespace Game.Core.Domain
                     }
 
                     DomainEventBatch batch = new DomainEventBatch(0, chooseOptionIntent);
-                    batch.Add(new DomainEvent(DomainEventType.ChoiceResolved)
+                    List<DomainEvent> choiceEvents = new List<DomainEvent>
                     {
-                        Amount = chooseOptionIntent.OptionIndex,
-                        SecondaryAmount = session.OptionCount,
-                        Reason = chooseOptionIntent.SessionId
-                    });
+                        new DomainEvent(DomainEventType.ChoiceResolved)
+                        {
+                            Amount = chooseOptionIntent.OptionIndex,
+                            SecondaryAmount = session.OptionCount,
+                            Reason = chooseOptionIntent.SessionId
+                        }
+                    };
+                    await _context.ResolveChoiceSessionAsync(session, chooseOptionIntent.OptionIndex, choiceEvents).ConfigureAwait(false);
+                    _context.ResolveDeadCards(choiceEvents);
+                    await _context.ProcessLifecycleAsync(choiceEvents).ConfigureAwait(false);
+                    _context.AppendPlayerDefeatedIfNeeded(choiceEvents);
+                    batch.AddRange(choiceEvents);
                     _context.Batches.Add(batch);
                     return batch;
                 }
@@ -95,6 +104,10 @@ namespace Game.Core.Domain
                 }
 
                 await _executor.ExecuteAllAsync().ConfigureAwait(false);
+                while (_queue.Count > 0)
+                {
+                    await _executor.ExecuteAllAsync().ConfigureAwait(false);
+                }
                 return _context.Batches.Count > beforeCount ? _context.Batches[_context.Batches.Count - 1] : null;
             }
             finally

@@ -196,6 +196,16 @@ namespace Game.Core.Domain.ContentContracts
             get { return 0; }
         }
 
+        public virtual ItemTargetMode TargetMode
+        {
+            get { return ItemTargetMode.None; }
+        }
+
+        public virtual int MaxUsesPerRoom
+        {
+            get { return 1; }
+        }
+
         public virtual bool CanActivate(ActiveRelicContext ctx)
         {
             return Kind == RelicKind.Active && ctx != null && ctx.Slot.CanActivate(Id);
@@ -206,17 +216,22 @@ namespace Game.Core.Domain.ContentContracts
             return Task.CompletedTask;
         }
 
-        public virtual Task OnRoomEnteredAsync()
+        public virtual Task OnRoomEnteredAsync(RoomLifecycleContext ctx)
         {
             return Task.CompletedTask;
         }
 
-        public virtual Task OnRoomClearedAsync()
+        public virtual Task OnRoomClearedAsync(RoomLifecycleContext ctx)
         {
             return Task.CompletedTask;
         }
 
-        public virtual Task OnEliteOrBossDefeatedAsync()
+        public virtual Task OnEliteOrBossDefeatedAsync(MonsterDefeatedContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnMonsterDefeatedAsync(MonsterDefeatedContext ctx)
         {
             return Task.CompletedTask;
         }
@@ -265,6 +280,21 @@ namespace Game.Core.Domain.ContentContracts
         }
 
         public virtual Task OnAfterDamageAsync(DamageContext ctx, DamageResult result)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnRoomEnteredAsync(RoomLifecycleContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnRoomClearedAsync(RoomLifecycleContext ctx)
+        {
+            return Task.CompletedTask;
+        }
+
+        public virtual Task OnMonsterDefeatedAsync(MonsterDefeatedContext ctx)
         {
             return Task.CompletedTask;
         }

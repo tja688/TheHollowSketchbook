@@ -166,11 +166,18 @@ namespace Game.Core.Domain.Interaction
     public sealed class ActivateRelicIntent : PlayerIntent
     {
         public ActivateRelicIntent(ModelId relicId)
+            : this(relicId, ItemTargetSelection.None)
+        {
+        }
+
+        public ActivateRelicIntent(ModelId relicId, ItemTargetSelection target)
             : base(IntentKind.ActivateRelic)
         {
             RelicId = relicId;
+            Target = target;
         }
 
         public ModelId RelicId { get; }
+        public ItemTargetSelection Target { get; }
     }
 }
