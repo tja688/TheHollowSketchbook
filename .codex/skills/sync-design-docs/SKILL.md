@@ -15,27 +15,31 @@ Use the root script. Do not manually copy folders.
 pwsh -NoProfile -ExecutionPolicy Bypass -File ".\sync-design-docs.ps1"
 ```
 
-2. Read the generated report:
+2. Read the latest index report:
 
 ```powershell
 docs/design-sync/latest-sync-report.md
 ```
 
-3. Inspect scoped git changes:
+3. Open the per-run diff report path named inside that index under `docs/design-sync/runs/`.
+
+4. Inspect scoped git changes:
 
 ```powershell
-git status --short -- "Assets/Docs/深入地牢" "docs/design-sync/latest-sync-report.md"
-git diff --name-status -- "Assets/Docs/深入地牢" "docs/design-sync/latest-sync-report.md"
-git diff -- "Assets/Docs/深入地牢" "docs/design-sync/latest-sync-report.md"
+git status --short -- "Assets/Docs/深入地牢" "docs/design-sync/latest-sync-report.md" "docs/design-sync/runs"
+git diff --name-status -- "Assets/Docs/深入地牢" "docs/design-sync/latest-sync-report.md" "docs/design-sync/runs"
+git diff -- "Assets/Docs/深入地牢" "docs/design-sync/latest-sync-report.md" "docs/design-sync/runs"
 ```
 
-4. Summarize added, updated, deleted, and notable content changes for the user.
+5. Summarize added, updated, deleted, and notable content changes for the user.
 
-5. Stop before changing gameplay code, infrastructure, scenes, prefabs, or assets unless the user explicitly asks for follow-up implementation.
+6. Stop before changing gameplay code, infrastructure, scenes, prefabs, or assets unless the user explicitly asks for follow-up implementation.
 
 ## Notes
 
 - Source defaults to `C:\Users\jinji\Desktop\文档\MyNote\游戏开发项目\深入地牢`.
 - Target defaults to `Assets\Docs\深入地牢`.
+- `docs/design-sync/latest-sync-report.md` is a small rolling index that points at the newest run report.
+- Per-run reports are written under `docs/design-sync/runs/` so cross-thread handoff can reference a single immutable diff document.
 - The script preserves retained Unity `.meta` files and deletes `.meta` files for removed documents.
 - The script does not commit changes.

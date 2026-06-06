@@ -1,7 +1,8 @@
 param(
     [string]$SourcePath = 'C:\Users\jinji\Desktop\文档\MyNote\游戏开发项目\深入地牢',
     [string]$TargetPath = (Join-Path $PSScriptRoot 'Assets\Docs\深入地牢'),
-    [string]$ReportPath = (Join-Path $PSScriptRoot 'docs\design-sync\latest-sync-report.md')
+    [string]$ReportPath = (Join-Path $PSScriptRoot 'docs\design-sync\latest-sync-report.md'),
+    [string]$RunReportDirectory = (Join-Path $PSScriptRoot 'docs\design-sync\runs')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -157,6 +158,13 @@ if (-not (Test-Path -LiteralPath $reportDirectory -PathType Container)) {
     New-Item -ItemType Directory -Path $reportDirectory | Out-Null
 }
 
+if (-not (Test-Path -LiteralPath $RunReportDirectory -PathType Container)) {
+    New-Item -ItemType Directory -Path $RunReportDirectory | Out-Null
+}
+
+$runReportStamp = (Get-Date).ToString('yyyyMMdd-HHmmss-fff')
+$runReportPath = Join-Path $RunReportDirectory "$runReportStamp-sync-report.md"
+
 $reportLines = New-Object System.Collections.Generic.List[string]
 $reportLines.Add('# Design Docs Sync Report')
 $reportLines.Add('')
@@ -179,8 +187,6 @@ Add-ReportSection -Title 'Deleted' -Items $deleted.ToArray()
 Add-ReportSection -Title 'Deleted Meta' -Items $deletedMeta.ToArray()
 Add-ReportSection -Title 'Unchanged' -Items $unchanged.ToArray()
 
-Set-Content -LiteralPath $ReportPath -Value $reportLines -Encoding UTF8
-
 $gitStatus = @()
 if (Get-Command git -ErrorAction SilentlyContinue) {
     $gitStatus = git -C $PSScriptRoot -c core.quotePath=false status --short -- 'Assets/Docs/深入地牢' 'docs/design-sync/latest-sync-report.md' 2>$null
@@ -200,8 +206,30 @@ else {
 }
 $reportLines.Add('')
 
-Set-Content -LiteralPath $ReportPath -Value $reportLines -Encoding UTF8
+Set-Content -LiteralPath $runReportPath -Value $reportLines -Encoding UTF8
+
+$latestLines = New-Object System.Collections.Generic.List[string]
+$latestLines.Add('# Design Docs Sync Latest')
+$latestLines.Add('')
+$latestLines.Add("- Latest run report: $([System.IO.Path]::GetRelativePath($reportDirectory, $runReportPath).Replace('\\', '/'))")
+$latestLines.Add("- Timestamp: $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss zzz'))")
+$latestLines.Add("- Source: $sourceRoot")
+$latestLines.Add("- Target: $targetRoot")
+$latestLines.Add('')
+$latestLines.Add('## Summary')
+$latestLines.Add('')
+$latestLines.Add("- Added: $($added.Count)")
+$latestLines.Add("- Updated: $($updated.Count)")
+$latestLines.Add("- Deleted: $($deleted.Count)")
+$latestLines.Add("- Deleted meta: $($deletedMeta.Count)")
+$latestLines.Add("- Unchanged: $($unchanged.Count)")
+$latestLines.Add('')
+$latestLines.Add('Full change details are in the latest run report above.')
+$latestLines.Add('')
+
+Set-Content -LiteralPath $ReportPath -Value $latestLines -Encoding UTF8
 
 Write-Host 'Design docs sync complete.'
 Write-Host "Added: $($added.Count), Updated: $($updated.Count), Deleted: $($deleted.Count), Deleted meta: $($deletedMeta.Count), Unchanged: $($unchanged.Count)"
-Write-Host "Report: $ReportPath"
+Write-Host "Latest report: $ReportPath"
+Write-Host "Run report: $runReportPath"

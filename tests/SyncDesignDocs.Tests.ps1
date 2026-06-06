@@ -21,7 +21,7 @@ Set-Content -LiteralPath (Join-Path $target '删除.md') -Value 'remove me' -Enc
 Set-Content -LiteralPath (Join-Path $target '删除.md.meta') -Value 'remove orphan meta' -Encoding UTF8
 
 try {
-    $scriptOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $scriptPath -SourcePath $source -TargetPath $target -ReportPath $report 2>&1
+    $scriptOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $scriptPath -SourcePath $source -TargetPath $target -ReportPath $report -RunReportDirectory (Join-Path $tempRoot 'runs') 2>&1
     if ($LASTEXITCODE -ne 0) { throw "Sync script failed with exit code $LASTEXITCODE. Output: $scriptOutput" }
 
     if (-not (Test-Path -LiteralPath (Join-Path $target '新增.md'))) { throw 'Expected added file to be copied.' }
@@ -31,8 +31,9 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $target '保留.md.meta'))) { throw 'Expected retained target file meta to be preserved.' }
     if (-not (Test-Path -LiteralPath (Join-Path $target '归档.meta'))) { throw 'Expected retained target folder meta to be preserved.' }
     if (-not (Test-Path -LiteralPath (Join-Path $target '归档\子文档.md'))) { throw 'Expected nested file to be copied.' }
-    if (-not (Test-Path -LiteralPath $report)) { throw 'Expected sync report to be written.' }
-    if (-not ((Get-Content -LiteralPath $report -Raw) -match 'Added')) { throw 'Expected report to include Added section.' }
+    if (-not (Test-Path -LiteralPath (Join-Path $tempRoot 'runs'))) { throw 'Expected run report directory to be created.' }
+    if (-not (Get-ChildItem -LiteralPath (Join-Path $tempRoot 'runs') -File | Select-Object -First 1)) { throw 'Expected per-run report to be written.' }
+    if (-not ((Get-Content -LiteralPath $report -Raw) -match 'Latest run report')) { throw 'Expected latest report to point at the per-run report.' }
 }
 finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
