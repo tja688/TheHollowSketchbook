@@ -49,7 +49,14 @@ namespace Game.Core.Domain.Rooms
         {
             if (ctx.Domain.RoomTransition != null)
             {
-                ctx.Domain.RoomTransition.EnterRoom(ctx, TargetRoomType);
+                System.Collections.Generic.List<Events.DomainEvent> transitionEvents = ctx.Domain.RoomTransition.EnterRoom(ctx, TargetRoomType);
+                if (transitionEvents != null)
+                {
+                    for (int i = 0; i < transitionEvents.Count; i++)
+                    {
+                        ctx.Events.Add(transitionEvents[i]);
+                    }
+                }
             }
 
             return Task.CompletedTask;

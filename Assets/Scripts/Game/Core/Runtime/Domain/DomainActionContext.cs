@@ -450,6 +450,7 @@ namespace Game.Core.Domain
                         CardRevealContext context = new CardRevealContext(this, revealedCard, domainEvent.Reason, events);
                         await revealedModel.OnRevealedAsync(context);
                         await NotifyCardTraitHooksAsync(revealedCard, trait => trait.OnCardFlippedAsync(context));
+                        ResolveDeadCards(events);
                     }
                 }
                 else if (domainEvent.EventType == DomainEventType.CardRemoved)
