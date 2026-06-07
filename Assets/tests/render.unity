@@ -6397,12 +6397,12 @@ PrefabInstance:
     - target: {fileID: 492377605164695752, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
       propertyPath: m_SizeDelta.x
-      value: 1.13965
+      value: 0.99407
       objectReference: {fileID: 0}
     - target: {fileID: 492377605164695752, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
       propertyPath: m_SizeDelta.y
-      value: 1.47452
+      value: 1.01017
       objectReference: {fileID: 0}
     - target: {fileID: 492377605164695752, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
@@ -6417,7 +6417,7 @@ PrefabInstance:
     - target: {fileID: 492377605164695752, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.17663
+      value: 0.15772
       objectReference: {fileID: 0}
     - target: {fileID: 492377605164695752, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
@@ -6442,7 +6442,7 @@ PrefabInstance:
     - target: {fileID: 492377605164695752, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -0.20745
+      value: -0.21596
       objectReference: {fileID: 0}
     - target: {fileID: 492377605164695752, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
@@ -6463,6 +6463,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2202871234134866114, guid: 9550e877f65203649b1e185b36f29a60,
+        type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0.376
+      objectReference: {fileID: 0}
+    - target: {fileID: 2202871234134866114, guid: 9550e877f65203649b1e185b36f29a60,
+        type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -0.116
       objectReference: {fileID: 0}
     - target: {fileID: 4673564229077477275, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
@@ -6512,7 +6522,8 @@ PrefabInstance:
       value: "\u5982\u679C\u6709\u7B80\u5355\u7684\u5F00\u59CB\u3001\u91CD\u5F00\u3001\u7ED3\u675F\u6E38\u620F\u7B49\u9700\u6C42\u653E\u5728\u8FD9\u91CC"
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 8281976206741314684, guid: 9550e877f65203649b1e185b36f29a60, type: 3}
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 492377605164695752, guid: 9550e877f65203649b1e185b36f29a60,
         type: 3}
