@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Game.Core;
+using Game.Core.Domain;
 using Game.Core.Domain.Cards;
 using Game.Core.Domain.Combat;
 using Game.Core.Domain.ContentContracts;
@@ -406,38 +407,42 @@ namespace Game.Content.Runtime
         public override int MaxHp => 4;
         public override int ContactDamageToPlayer => 2;
 
-        public override Task OnRevealedAsync(TrapContext ctx)
+        public override async Task OnRevealedAsync(TrapContext ctx)
         {
-            ctx.Domain.PendingTriggers.Enqueue(new PendingTrigger(ctx.TrapCard.InstanceId, PendingTriggerTiming.AfterPlayerAction, ctx.ActionIndex + 1, "spike"));
-            return Task.CompletedTask;
+            await TriggerSpikeAsync(ctx.Domain, ctx.TrapCard, ctx.Events).ConfigureAwait(false);
         }
 
         public override async Task OnPendingTriggerAsync(PendingTriggerContext ctx)
         {
-            if (!ctx.Card.Coord.HasValue)
+            await TriggerSpikeAsync(ctx.Domain, ctx.Card, ctx.Events).ConfigureAwait(false);
+        }
+
+        private static async Task TriggerSpikeAsync(DomainActionContext domain, CardInstance spikeCard, ICollection<DomainEvent> events)
+        {
+            if (domain == null || spikeCard == null || events == null || !spikeCard.Coord.HasValue)
             {
                 return;
             }
 
-            IReadOnlyList<GridCoord> neighbors = GridQueries.OrthogonalNeighbors(ctx.Card.Coord.Value);
+            IReadOnlyList<GridCoord> neighbors = GridQueries.OrthogonalNeighbors(spikeCard.Coord.Value);
             for (int i = 0; i < neighbors.Count; i++)
             {
-                CardInstance target = ctx.Domain.Grid.GetTopCard(neighbors[i]);
+                CardInstance target = domain.Grid.GetTopCard(neighbors[i]);
                 if (target == null || !target.IsFaceUp)
                 {
                     continue;
                 }
 
-                await ctx.ApplyDamageAsync(new DamageInfo(
-                    DamageSource.FromCard(ctx.Card.InstanceId),
+                await domain.Combat.ApplyDamageAsync(new DamageInfo(
+                    DamageSource.FromCard(spikeCard.InstanceId),
                     DamageTarget.Card(target.InstanceId),
                     6,
                     DamageKind.Trap,
                     true,
-                    "SpikeTrap")).ConfigureAwait(false);
+                    "SpikeTrap"), events).ConfigureAwait(false);
             }
 
-            ctx.Domain.ResolveDeadCards(ctx.Events);
+            domain.ResolveDeadCards(events);
         }
     }
 

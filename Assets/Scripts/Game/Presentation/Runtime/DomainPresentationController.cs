@@ -33,10 +33,13 @@ namespace Game.Presentation.Runtime
         [SerializeField] private bool _startOnEnable = true;
 
         [Header("View Roots")]
+        [SerializeField] private Transform _uiRoot;
         [SerializeField] private Transform _gridRoot;
         [SerializeField] private Canvas _detailPanel;
         [SerializeField] private Canvas _playerPanel;
         [SerializeField] private Transform _relicRoot;
+        [SerializeField] private Transform _choiceRoot;
+        [SerializeField] private Canvas _simpleUiCanvas;
         [SerializeField] private Canvas _activeRelicSlotCanvas;
         [SerializeField] private Canvas _passiveRelicSlotCanvas;
         [SerializeField] private TextMeshProUGUI _detailTitleText;
@@ -47,6 +50,7 @@ namespace Game.Presentation.Runtime
 
         [Header("Prefabs")]
         [SerializeField] private GameObject _cardPrefab;
+        [SerializeField] private Button _simpleActionButtonPrefab;
 
         [Header("Visual Tuning")]
         [SerializeField] private float _moveDuration = 0.38f;
@@ -85,31 +89,46 @@ namespace Game.Presentation.Runtime
         private readonly Dictionary<int, Vector3> _gridWorldPositionsByCell = new Dictionary<int, Vector3>(9);
         private readonly Dictionary<CardInstanceId, CardView> _cardViews = new Dictionary<CardInstanceId, CardView>();
         private readonly List<CardView> _routeChoiceViews = new List<CardView>();
+        private readonly List<Canvas> _choiceSlotCanvases = new List<Canvas>(3);
+        private readonly List<CardView> _choiceCardViews = new List<CardView>(3);
         private readonly Queue<DomainEventBatch> _pendingBatches = new Queue<DomainEventBatch>();
         private readonly List<ChoiceButtonView> _choiceButtons = new List<ChoiceButtonView>();
-        private readonly List<CardView> _virtualSelectionViews = new List<CardView>();
+        private readonly Dictionary<CardView, VirtualDetail> _virtualDetails = new Dictionary<CardView, VirtualDetail>();
 
         private bool _isReady;
         private bool _isAnimating;
         private bool _isChoosingTarget;
         private bool _isChoosingRelicTarget;
         private bool _isChoosingChoice;
+        private bool _pendingAutoStart;
+        private bool _preferCombatCamera;
         private InventorySlot _pendingItemSlot;
         private ModelId _pendingRelicId;
         private ItemTargetMode _pendingTargetMode;
         private CardInstanceId? _pendingPrimaryCard;
-        private CardView _pendingPrimaryVirtualView;
         private string _pendingChoiceSessionId;
         private int _lastConsumedBatchCount;
+        private int _passiveRelicDisplayIndex;
         private CardView _hoveredView;
+        private Button _restartRunButton;
+        private Button _cancelSelectionButton;
+        private TextMeshProUGUI _restartRunLabel;
+        private TextMeshProUGUI _cancelSelectionLabel;
+        private Component _globalCamera;
+        private Component _combatCamera;
+        private Component _choiceCamera;
+        private Component _relicTargetCamera;
+        private static TMP_FontAsset s_runtimeChineseFallback;
 
         public bool IsRunning => _isReady;
 
         private void OnEnable()
         {
+            LoadConfig();
+            ApplyConfig();
             if (_startOnEnable)
             {
-                StartPresentation();
+                TryStartPresentationOrDefer();
             }
         }
 
@@ -120,15 +139,21 @@ namespace Game.Presentation.Runtime
             ApplyConfig();
             DOTween.Init(false, true, LogBehaviour.ErrorsOnly);
             EnsureBindings();
+            EnsureRuntimeFontFallbacks();
             BuildGridLookup();
+            EnsureChoiceSlots();
+            EnsureSimpleActionButtons();
+            EnsureCameraBindings();
             ClearAllRuntimeViews();
 
             if (CreateRunContext == null)
             {
-                Debug.LogError("[DomainPresentationController] CreateRunContext delegate is not assigned. Cannot start run.");
+                _pendingAutoStart = true;
+                Debug.LogWarning("[DomainPresentationController] CreateRunContext delegate is not assigned yet. Waiting for bootstrap.");
                 return;
             }
 
+            _pendingAutoStart = false;
             _context = CreateRunContext(_seed);
             _facade = new DomainFacade(_context);
             _lastConsumedBatchCount = _context.Batches.Count;
@@ -141,12 +166,20 @@ namespace Game.Presentation.Runtime
             FullRefreshImmediate();
             EnqueuePendingBatches();
             PlayQueuedBatchesIfIdle();
+            RefreshSimpleUiState();
+            ApplyCameraMode();
         }
 
         private void Update()
         {
             if (!_isReady)
             {
+                if (_pendingAutoStart && CreateRunContext != null)
+                {
+                    StartPresentation();
+                }
+
+                RefreshSimpleUiState();
                 return;
             }
 
@@ -157,6 +190,9 @@ namespace Game.Presentation.Runtime
             }
 
             UpdateHoverDetail();
+            HandleScrollShortcuts();
+            RefreshSimpleUiState();
+            ApplyCameraMode();
         }
 
         private void LoadConfig()
@@ -223,83 +259,421 @@ namespace Game.Presentation.Runtime
 
         private void EnsureBindings()
         {
+            if (_uiRoot == null)
+            {
+                _uiRoot = FindSceneTransformExact("UI");
+            }
+
             if (_gridRoot == null)
             {
-                Transform found = transform.Find("UI/九宫场地格");
-                if (found != null)
-                {
-                    _gridRoot = found;
-                }
+                _gridRoot = FindDescendantByNameContains(_uiRoot, "九宫场地格");
             }
 
             if (_detailPanel == null)
             {
-                _detailPanel = FindCanvas("UI/具体信息面板");
+                _detailPanel = FindCanvasByNameContains(_uiRoot, "具体信息面板");
+                _detailPanel ??= FindCanvasByNameContains(_uiRoot, "详情面板");
             }
 
             if (_playerPanel == null)
             {
-                _playerPanel = FindCanvas("UI/玩家信息面板");
+                _playerPanel = FindCanvasByNameContains(_uiRoot, "玩家信息面板");
             }
 
             if (_relicRoot == null)
             {
-                Transform found = transform.Find("UI/遗物格");
-                if (found != null)
-                {
-                    _relicRoot = found;
-                }
+                _relicRoot = FindDescendantByNameContains(_uiRoot, "遗物格");
+            }
+
+            if (_choiceRoot == null)
+            {
+                _choiceRoot = FindDescendantByNameContains(_uiRoot, "三选一遗物格");
+            }
+
+            if (_simpleUiCanvas == null)
+            {
+                _simpleUiCanvas = FindCanvasByNameContains(_uiRoot, "开始、重开、结束游戏");
+                _simpleUiCanvas ??= FindCanvasByNameContains(_uiRoot, "简易UI");
+                _simpleUiCanvas ??= FindCanvasByNameContains(_uiRoot, "结束游戏锚点");
             }
 
             if (_activeRelicSlotCanvas == null && _relicRoot != null)
             {
-                _activeRelicSlotCanvas = _relicRoot.Find("主动遗物格（只有一个格子，先设计鼠标移动到这里时上下切换换遗物））")?.GetComponent<Canvas>();
+                _activeRelicSlotCanvas = FindCanvasByNameContains(_relicRoot, "主动遗物格");
             }
 
             if (_passiveRelicSlotCanvas == null && _relicRoot != null)
             {
-                _passiveRelicSlotCanvas = _relicRoot.Find("被动遗物格（只有一个格子，先设计鼠标移动到这里时上下切换换遗物）")?.GetComponent<Canvas>();
+                _passiveRelicSlotCanvas = FindCanvasByNameContains(_relicRoot, "被动遗物格");
             }
 
             if (_detailTitleText == null && _detailPanel != null)
             {
-                _detailTitleText = _detailPanel.transform.Find("标题（写这个东西是啥）")?.GetComponent<TextMeshProUGUI>();
+                _detailTitleText = FindTextByNameContains(_detailPanel.transform, "标题");
             }
 
             if (_detailBodyText == null && _detailPanel != null)
             {
-                _detailBodyText = _detailPanel.transform.Find("内容（这个东西的具体作用、能力））")?.GetComponent<TextMeshProUGUI>();
+                _detailBodyText = FindTextByNameContains(_detailPanel.transform, "内容");
             }
 
             if (_playerRoleText == null && _playerPanel != null)
             {
-                _playerRoleText = _playerPanel.transform.Find("角色（职业）")?.GetComponent<TextMeshProUGUI>();
+                _playerRoleText = FindTextByNameContains(_playerPanel.transform, "角色");
             }
 
             if (_playerHealthText == null && _playerPanel != null)
             {
-                _playerHealthText = _playerPanel.transform.Find("生命值")?.GetComponent<TextMeshProUGUI>();
+                _playerHealthText = FindTextByNameContains(_playerPanel.transform, "生命值");
             }
 
             if (_playerGoldText == null && _playerPanel != null)
             {
-                _playerGoldText = _playerPanel.transform.Find("金币")?.GetComponent<TextMeshProUGUI>();
+                _playerGoldText = FindTextByNameContains(_playerPanel.transform, "金币");
             }
 
             if (_cardPrefab == null && _gridRoot != null)
             {
-                Transform sampleCard = _gridRoot.Find("格7/标准卡面模板");
+                Transform sampleCard = FindDescendantByNameContains(_gridRoot, "标准卡面模板");
+                sampleCard ??= FindDescendantByNameContains(_gridRoot, "标准卡牌模板");
                 if (sampleCard != null)
                 {
                     _cardPrefab = sampleCard.gameObject;
                 }
             }
+
+            if (_simpleActionButtonPrefab == null && _simpleUiCanvas != null)
+            {
+                _simpleActionButtonPrefab = FindButtonByNameContains(_simpleUiCanvas.transform, "标准Button");
+                _simpleActionButtonPrefab ??= FindButtonByNameContains(_simpleUiCanvas.transform, "标准按钮");
+            }
+
+            if (_restartRunButton == null && _simpleUiCanvas != null)
+            {
+                _restartRunButton = FindButtonByNameContains(_simpleUiCanvas.transform, "开始演出按钮");
+            }
+
+            if (_cancelSelectionButton == null && _simpleUiCanvas != null)
+            {
+                _cancelSelectionButton = FindButtonByNameContains(_simpleUiCanvas.transform, "取消选择按钮");
+            }
+
+            if (_restartRunLabel == null && _restartRunButton != null)
+            {
+                _restartRunLabel = FindButtonLabel(_restartRunButton.transform);
+            }
+
+            if (_cancelSelectionLabel == null && _cancelSelectionButton != null)
+            {
+                _cancelSelectionLabel = FindButtonLabel(_cancelSelectionButton.transform);
+            }
         }
 
-        private Canvas FindCanvas(string path)
+        private void EnsureChoiceSlots()
         {
-            Transform found = transform.Find(path);
+            _choiceSlotCanvases.Clear();
+            if (_choiceRoot == null)
+            {
+                return;
+            }
+
+            TryAddChoiceSlot("一号位");
+            TryAddChoiceSlot("二号位");
+            TryAddChoiceSlot("三号位");
+        }
+
+        private void TryAddChoiceSlot(string nameFragment)
+        {
+            Canvas canvas = FindCanvasByNameContains(_choiceRoot, nameFragment);
+            if (canvas != null)
+            {
+                _choiceSlotCanvases.Add(canvas);
+            }
+        }
+
+        private void EnsureRuntimeFontFallbacks()
+        {
+            if (s_runtimeChineseFallback == null)
+            {
+                TMP_FontAsset sourceFontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/MaShanZheng SDF");
+                if (sourceFontAsset == null && _cardPrefab != null)
+                {
+                    sourceFontAsset = _cardPrefab.GetComponentInChildren<TextMeshProUGUI>(true)?.font;
+                }
+
+                Font sourceFont = sourceFontAsset != null ? sourceFontAsset.sourceFontFile : null;
+                if (sourceFont != null)
+                {
+                    s_runtimeChineseFallback = TMP_FontAsset.CreateFontAsset(
+                        sourceFont,
+                        90,
+                        9,
+                        UnityEngine.TextCore.LowLevel.GlyphRenderMode.SDFAA,
+                        1024,
+                        1024,
+                        AtlasPopulationMode.Dynamic,
+                        true);
+                    s_runtimeChineseFallback.name = "[Runtime] Chinese Fallback";
+                    s_runtimeChineseFallback.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                    if (s_runtimeChineseFallback.material != null)
+                    {
+                        s_runtimeChineseFallback.material.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                    }
+
+                    if (s_runtimeChineseFallback.atlasTextures != null)
+                    {
+                        for (int i = 0; i < s_runtimeChineseFallback.atlasTextures.Length; i++)
+                        {
+                            if (s_runtimeChineseFallback.atlasTextures[i] != null)
+                            {
+                                s_runtimeChineseFallback.atlasTextures[i].hideFlags = HideFlags.DontUnloadUnusedAsset;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (s_runtimeChineseFallback == null)
+            {
+                return;
+            }
+
+            AddFallbackFont(TMP_Settings.defaultFontAsset, s_runtimeChineseFallback);
+            ApplyFallbackToTexts(_uiRoot, s_runtimeChineseFallback);
+            if (_cardPrefab != null)
+            {
+                ApplyFallbackToTexts(_cardPrefab.transform, s_runtimeChineseFallback);
+            }
+        }
+
+        private static void ApplyFallbackToTexts(Transform root, TMP_FontAsset fallback)
+        {
+            if (root == null || fallback == null)
+            {
+                return;
+            }
+
+            TMP_Text[] texts = root.GetComponentsInChildren<TMP_Text>(true);
+            for (int i = 0; i < texts.Length; i++)
+            {
+                TMP_Text text = texts[i];
+                if (text == null)
+                {
+                    continue;
+                }
+
+                AddFallbackFont(text.font, fallback);
+                text.SetAllDirty();
+            }
+        }
+
+        private static void AddFallbackFont(TMP_FontAsset target, TMP_FontAsset fallback)
+        {
+            if (target == null || fallback == null || target == fallback)
+            {
+                return;
+            }
+
+            target.fallbackFontAssetTable ??= new List<TMP_FontAsset>();
+            if (target.fallbackFontAssetTable.Contains(fallback))
+            {
+                return;
+            }
+
+            target.fallbackFontAssetTable.Add(fallback);
+        }
+
+        private void EnsureSimpleActionButtons()
+        {
+            if (_simpleUiCanvas == null)
+            {
+                return;
+            }
+
+            if (_restartRunButton == null)
+            {
+                _restartRunButton = CreateSimpleActionButton(_simpleUiCanvas.transform, "开始演出按钮（运行时兜底）", new Vector2(-150f, -72f), out _restartRunLabel);
+            }
+            else
+            {
+                _restartRunLabel ??= FindButtonLabel(_restartRunButton.transform);
+            }
+
+            _restartRunButton.onClick.RemoveAllListeners();
+            _restartRunButton.onClick.AddListener(StartPresentation);
+
+            if (_cancelSelectionButton == null)
+            {
+                _cancelSelectionButton = CreateSimpleActionButton(_simpleUiCanvas.transform, "取消选择按钮（运行时兜底）", new Vector2(150f, -72f), out _cancelSelectionLabel);
+            }
+            else
+            {
+                _cancelSelectionLabel ??= FindButtonLabel(_cancelSelectionButton.transform);
+            }
+
+            if (_cancelSelectionLabel != null)
+            {
+                _cancelSelectionLabel.text = "取消选择";
+            }
+
+            _cancelSelectionButton.onClick.RemoveAllListeners();
+            _cancelSelectionButton.onClick.AddListener(() =>
+            {
+                CancelSelectionModes();
+                RefreshDetailPanelDefault();
+                ApplyCameraMode();
+            });
+        }
+
+        private void EnsureCameraBindings()
+        {
+            _globalCamera = FindCameraComponentByBestMatch("玩家位置全局视角（默认）", "全局视角（默认）", "玩家位置全局视角");
+            _combatCamera = FindCameraComponentByBestMatch("专注战斗场地的竖向视角（可跟全局视角切换）", "专注战斗场地", "竖向视角");
+            _choiceCamera = FindCameraComponentByBestMatch("三选一的时候专属摄视角", "三选一");
+            _relicTargetCamera = FindCameraComponentByBestMatch("主动遗物时斜向风格专属视角", "主动遗物");
+        }
+
+        private void TryStartPresentationOrDefer()
+        {
+            if (CreateRunContext != null)
+            {
+                StartPresentation();
+                return;
+            }
+
+            _pendingAutoStart = true;
+        }
+
+        private Transform FindSceneTransformExact(string name)
+        {
+            Transform[] transforms = FindObjectsByType<Transform>(FindObjectsSortMode.None);
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                Transform candidate = transforms[i];
+                if (candidate != null && candidate.name == name)
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        private static Transform FindDescendantByNameContains(Transform root, string nameFragment)
+        {
+            if (root == null || string.IsNullOrWhiteSpace(nameFragment))
+            {
+                return null;
+            }
+
+            Transform[] transforms = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                if (transforms[i].name.Contains(nameFragment, StringComparison.Ordinal))
+                {
+                    return transforms[i];
+                }
+            }
+
+            return null;
+        }
+
+        private static Canvas FindCanvasByNameContains(Transform root, string nameFragment)
+        {
+            Transform found = FindDescendantByNameContains(root, nameFragment);
             return found != null ? found.GetComponent<Canvas>() : null;
+        }
+
+        private static TextMeshProUGUI FindTextByNameContains(Transform root, string nameFragment)
+        {
+            Transform found = FindDescendantByNameContains(root, nameFragment);
+            return found != null ? found.GetComponent<TextMeshProUGUI>() : null;
+        }
+
+        private static Button FindButtonByNameContains(Transform root, string nameFragment)
+        {
+            Transform found = FindDescendantByNameContains(root, nameFragment);
+            return found != null ? found.GetComponent<Button>() : null;
+        }
+
+        private static TextMeshProUGUI FindButtonLabel(Transform root)
+        {
+            if (root == null)
+            {
+                return null;
+            }
+
+            TextMeshProUGUI[] labels = root.GetComponentsInChildren<TextMeshProUGUI>(true);
+            return labels.Length > 0 ? labels[0] : null;
+        }
+
+        private static Component FindCameraComponentByBestMatch(params string[] preferredNames)
+        {
+            Transform[] transforms = FindObjectsByType<Transform>(FindObjectsSortMode.None);
+            for (int nameIndex = 0; nameIndex < preferredNames.Length; nameIndex++)
+            {
+                string preferredName = preferredNames[nameIndex];
+                if (string.IsNullOrWhiteSpace(preferredName))
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < transforms.Length; i++)
+                {
+                    Transform candidate = transforms[i];
+                    if (candidate == null || !string.Equals(candidate.name, preferredName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    Component exactComponent = FindVirtualCameraComponent(candidate);
+                    if (exactComponent != null)
+                    {
+                        return exactComponent;
+                    }
+                }
+            }
+
+            for (int nameIndex = 0; nameIndex < preferredNames.Length; nameIndex++)
+            {
+                string preferredName = preferredNames[nameIndex];
+                if (string.IsNullOrWhiteSpace(preferredName))
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < transforms.Length; i++)
+                {
+                    Transform candidate = transforms[i];
+                    if (candidate == null || !candidate.name.Contains(preferredName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    Component fuzzyComponent = FindVirtualCameraComponent(candidate);
+                    if (fuzzyComponent != null)
+                    {
+                        return fuzzyComponent;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static Component FindVirtualCameraComponent(Transform candidate)
+        {
+            Component[] components = candidate.GetComponents<Component>();
+            for (int componentIndex = 0; componentIndex < components.Length; componentIndex++)
+            {
+                Component component = components[componentIndex];
+                if (component != null && component.GetType().FullName == "Cinemachine.CinemachineVirtualCamera")
+                {
+                    return component;
+                }
+            }
+
+            return null;
         }
 
         private void BuildGridLookup()
@@ -355,6 +729,8 @@ namespace Game.Presentation.Runtime
             RefreshDetailPanelDefault();
             RebuildChoiceButtons();
             RefreshRelicViews();
+            RefreshSimpleUiState();
+            ApplyCameraMode();
         }
 
         private void ClearAllRuntimeViews()
@@ -375,9 +751,37 @@ namespace Game.Presentation.Runtime
                 }
             }
 
+            foreach (CardView view in _choiceCardViews)
+            {
+                if (view != null)
+                {
+                    Destroy(view.gameObject);
+                }
+            }
+
             _cardViews.Clear();
             _choiceButtons.Clear();
+            _choiceCardViews.Clear();
+            _virtualDetails.Clear();
             _routeChoiceViews.Clear();
+
+            if (_activeRelicSlotCanvas != null)
+            {
+                ClearChildrenExceptCardViews(_activeRelicSlotCanvas.transform);
+            }
+
+            if (_passiveRelicSlotCanvas != null)
+            {
+                ClearChildrenExceptCardViews(_passiveRelicSlotCanvas.transform);
+            }
+
+            for (int i = 0; i < _choiceSlotCanvases.Count; i++)
+            {
+                if (_choiceSlotCanvases[i] != null)
+                {
+                    ClearChildrenExceptCardViews(_choiceSlotCanvases[i].transform);
+                }
+            }
         }
 
         private void EnqueuePendingBatches()
@@ -942,6 +1346,7 @@ namespace Game.Presentation.Runtime
                 return;
             }
 
+            PruneVirtualDetails();
             RefreshActiveRelicView();
             RefreshPassiveRelicView();
         }
@@ -976,6 +1381,7 @@ namespace Game.Presentation.Runtime
             view.SetOverlayText($"{_context.Relics.ActiveSlot.UsesRemainingThisRoom}/{_context.Relics.ActiveSlot.MaxUsesPerRoom}");
             view.SetPassive(false);
             view.SetOnClick(OnActiveRelicClicked);
+            RememberVirtualDetail(view, title, desc);
         }
 
         private void RefreshPassiveRelicView()
@@ -988,10 +1394,12 @@ namespace Game.Presentation.Runtime
             ClearChildrenExceptCardViews(_passiveRelicSlotCanvas.transform);
             if (_context.Relics.PassiveRelics.Count == 0)
             {
+                _passiveRelicDisplayIndex = 0;
                 return;
             }
 
-            ModelId relicId = _context.Relics.PassiveRelics[_context.Relics.PassiveRelics.Count - 1];
+            _passiveRelicDisplayIndex = Mathf.Clamp(_passiveRelicDisplayIndex, 0, _context.Relics.PassiveRelics.Count - 1);
+            ModelId relicId = _context.Relics.PassiveRelics[_passiveRelicDisplayIndex];
             GameObject cardObject = Instantiate(_cardPrefab, _passiveRelicSlotCanvas.transform, false);
             CardView view = cardObject.GetComponent<CardView>();
             if (view == null)
@@ -1003,9 +1411,17 @@ namespace Game.Presentation.Runtime
             view.RectTransform.localPosition = new Vector3(0f, 0f, HiddenZ);
             view.RectTransform.localRotation = Quaternion.identity;
             view.RectTransform.localScale = Vector3.one;
-            view.SyncVirtual(ResolveRelicTitle(relicId), ResolveRelicDescription(relicId, false), string.Empty, string.Empty, _relicColor, true);
+            string title = ResolveRelicTitle(relicId);
+            string desc = ResolveRelicDescription(relicId, false);
+            view.SyncVirtual(title, desc, string.Empty, string.Empty, _relicColor, true);
             view.SetPassive(true);
-            view.SetOnClick(() => SetDetailText(ResolveRelicTitle(relicId), ResolveRelicDescription(relicId, false)));
+            if (_context.Relics.PassiveRelics.Count > 1)
+            {
+                view.SetOverlayText($"{_passiveRelicDisplayIndex + 1}/{_context.Relics.PassiveRelics.Count}");
+            }
+
+            view.SetOnClick(() => SetDetailText(title, desc));
+            RememberVirtualDetail(view, title, desc);
         }
 
         private void ClearChildrenExceptCardViews(Transform root)
@@ -1030,11 +1446,25 @@ namespace Game.Presentation.Runtime
                 }
             }
             _choiceButtons.Clear();
+
+            foreach (CardView choiceView in _choiceCardViews)
+            {
+                if (choiceView != null)
+                {
+                    Destroy(choiceView.gameObject);
+                }
+            }
+            _choiceCardViews.Clear();
+            PruneVirtualDetails();
             _isChoosingChoice = false;
             _pendingChoiceSessionId = string.Empty;
 
             if (_context == null || _detailPanel == null)
             {
+                if (_choiceRoot != null)
+                {
+                    _choiceRoot.gameObject.SetActive(false);
+                }
                 return;
             }
 
@@ -1048,11 +1478,26 @@ namespace Game.Presentation.Runtime
                 _isChoosingChoice = true;
                 _pendingChoiceSessionId = session.SessionId;
                 SetDetailText(ResolveChoiceTitle(session), ResolveChoiceDescription(session));
-                for (int i = 0; i < session.OptionCount; i++)
+                if (_choiceSlotCanvases.Count >= session.OptionCount && session.OptionCount <= 3)
                 {
-                    CreateChoiceButton(session, i);
+                    for (int i = 0; i < session.OptionCount; i++)
+                    {
+                        CreateChoiceCard(session, i);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < session.OptionCount; i++)
+                    {
+                        CreateChoiceButton(session, i);
+                    }
                 }
                 break;
+            }
+
+            if (_choiceRoot != null)
+            {
+                _choiceRoot.gameObject.SetActive(_isChoosingChoice);
             }
         }
 
@@ -1097,6 +1542,35 @@ namespace Game.Presentation.Runtime
             view.Initialize(titleText, bodyText);
             view.Bind(ResolveChoiceOptionTitle(session, optionIndex), ResolveChoiceOptionBody(session, optionIndex), () => OnChoiceSelected(session, optionIndex));
             _choiceButtons.Add(view);
+        }
+
+        private void CreateChoiceCard(ChoiceSession session, int optionIndex)
+        {
+            Canvas slotCanvas = _choiceSlotCanvases[optionIndex];
+            if (slotCanvas == null)
+            {
+                return;
+            }
+
+            ClearChildrenExceptCardViews(slotCanvas.transform);
+            GameObject cardObject = Instantiate(_cardPrefab, slotCanvas.transform, false);
+            CardView view = cardObject.GetComponent<CardView>();
+            if (view == null)
+            {
+                view = cardObject.AddComponent<CardView>();
+            }
+
+            string title = ResolveChoiceOptionTitle(session, optionIndex);
+            string body = ResolveChoiceOptionBody(session, optionIndex);
+            view.Initialize(this);
+            view.RectTransform.localPosition = new Vector3(0f, 0f, HiddenZ);
+            view.RectTransform.localRotation = Quaternion.identity;
+            view.RectTransform.localScale = Vector3.one * 0.96f;
+            view.SyncVirtual(title, body, string.Empty, string.Empty, ResolveChoiceOptionColor(session), true);
+            view.SetOnClick(() => OnChoiceSelected(session, optionIndex));
+            view.RectTransform.DOScale(1f, 0.24f).SetEase(Ease.OutQuart);
+            _choiceCardViews.Add(view);
+            RememberVirtualDetail(view, title, body);
         }
 
         private async void OnChoiceSelected(ChoiceSession session, int optionIndex)
@@ -1490,6 +1964,12 @@ namespace Game.Presentation.Runtime
                 return;
             }
 
+            if (_hoveredView != null && _virtualDetails.TryGetValue(_hoveredView, out VirtualDetail virtualDetail))
+            {
+                SetDetailText(virtualDetail.Title, virtualDetail.Body);
+                return;
+            }
+
             if (_hoveredView != null && TryGetBackingCard(_hoveredView, out CardInstance card))
             {
                 SetDetailText(ResolveCardTitle(card), ResolveCardDescription(card));
@@ -1817,6 +2297,201 @@ namespace Game.Presentation.Runtime
             };
         }
 
+        private void RefreshSimpleUiState()
+        {
+            if (_restartRunLabel != null)
+            {
+                _restartRunLabel.text = _isReady ? "重开本局" : "开始演出";
+            }
+
+            if (_cancelSelectionButton != null)
+            {
+                _cancelSelectionButton.gameObject.SetActive(_isChoosingTarget || _isChoosingRelicTarget || _isChoosingChoice);
+            }
+        }
+
+        private void HandleScrollShortcuts()
+        {
+            float delta = UnityEngine.Input.mouseScrollDelta.y;
+            if (Mathf.Abs(delta) < 0.01f)
+            {
+                return;
+            }
+
+            if (IsPointerOverCanvasRect(_passiveRelicSlotCanvas))
+            {
+                CyclePassiveRelicDisplay(delta > 0f ? -1 : 1);
+                return;
+            }
+
+            if (IsPointerOverCanvasRect(_activeRelicSlotCanvas))
+            {
+                return;
+            }
+
+            if (_isChoosingChoice || _isChoosingRelicTarget)
+            {
+                return;
+            }
+
+            _preferCombatCamera = !_preferCombatCamera;
+            ApplyCameraMode();
+        }
+
+        private void CyclePassiveRelicDisplay(int delta)
+        {
+            if (_context == null || _context.Relics.PassiveRelics.Count <= 1)
+            {
+                return;
+            }
+
+            int count = _context.Relics.PassiveRelics.Count;
+            _passiveRelicDisplayIndex = (_passiveRelicDisplayIndex + delta + count) % count;
+            RefreshPassiveRelicView();
+            RefreshDetailPanelDefault();
+        }
+
+        private bool IsPointerOverCanvasRect(Canvas canvas)
+        {
+            if (canvas == null)
+            {
+                return false;
+            }
+
+            RectTransform rect = canvas.transform as RectTransform;
+            if (rect == null)
+            {
+                return false;
+            }
+
+            Camera eventCamera = canvas.worldCamera != null ? canvas.worldCamera : Camera.main;
+            return RectTransformUtility.RectangleContainsScreenPoint(rect, UnityEngine.Input.mousePosition, eventCamera);
+        }
+
+        private void ApplyCameraMode()
+        {
+            EnsureCameraBindings();
+            SetCameraPriority(_globalCamera, (!_isChoosingChoice && !_isChoosingRelicTarget && !_preferCombatCamera) ? 30 : 0);
+            SetCameraPriority(_combatCamera, (!_isChoosingChoice && !_isChoosingRelicTarget && _preferCombatCamera) ? 30 : 0);
+            SetCameraPriority(_choiceCamera, _isChoosingChoice ? 40 : 0);
+            SetCameraPriority(_relicTargetCamera, _isChoosingRelicTarget ? 50 : 0);
+        }
+
+        private static void SetCameraPriority(Component cameraComponent, int priority)
+        {
+            if (cameraComponent == null)
+            {
+                return;
+            }
+
+            System.Reflection.PropertyInfo property = cameraComponent.GetType().GetProperty("Priority");
+            if (property != null && property.CanWrite)
+            {
+                property.SetValue(cameraComponent, priority);
+            }
+        }
+
+        private Button CreateSimpleActionButton(Transform parent, string objectName, Vector2 anchoredPosition, out TextMeshProUGUI label)
+        {
+            Button templateButton = _simpleActionButtonPrefab;
+            templateButton ??= FindButtonByNameContains(parent, "标准Button");
+            templateButton ??= FindButtonByNameContains(parent, "标准按钮");
+            if (templateButton != null)
+            {
+                Button clonedButton = Instantiate(templateButton, parent, false);
+                clonedButton.name = objectName;
+                RectTransform clonedRect = clonedButton.GetComponent<RectTransform>();
+                if (clonedRect != null)
+                {
+                    clonedRect.anchorMin = new Vector2(0.5f, 0.5f);
+                    clonedRect.anchorMax = new Vector2(0.5f, 0.5f);
+                    clonedRect.anchoredPosition = anchoredPosition;
+                }
+
+                label = FindButtonLabel(clonedButton.transform);
+                if (label != null && s_runtimeChineseFallback != null)
+                {
+                    label.font = s_runtimeChineseFallback;
+                }
+
+                return clonedButton;
+            }
+
+            GameObject buttonObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            buttonObject.transform.SetParent(parent, false);
+            RectTransform rect = buttonObject.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(220f, 74f);
+            rect.anchoredPosition = anchoredPosition;
+
+            Image image = buttonObject.GetComponent<Image>();
+            image.color = new Color(0.92f, 0.88f, 0.78f, 0.94f);
+
+            GameObject textObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(buttonObject.transform, false);
+            RectTransform textRect = textObject.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(12f, 12f);
+            textRect.offsetMax = new Vector2(-12f, -12f);
+            label = textObject.GetComponent<TextMeshProUGUI>();
+            label.alignment = TextAlignmentOptions.Center;
+            label.fontSize = 28f;
+            label.color = new Color(0.12f, 0.10f, 0.08f, 1f);
+            if (s_runtimeChineseFallback != null)
+            {
+                label.font = s_runtimeChineseFallback;
+            }
+
+            return buttonObject.GetComponent<Button>();
+        }
+
+        private void RememberVirtualDetail(CardView view, string title, string body)
+        {
+            if (view == null)
+            {
+                return;
+            }
+
+            _virtualDetails[view] = new VirtualDetail(title, body);
+        }
+
+        private void PruneVirtualDetails()
+        {
+            List<CardView> remove = null;
+            foreach (KeyValuePair<CardView, VirtualDetail> pair in _virtualDetails)
+            {
+                if (pair.Key != null)
+                {
+                    continue;
+                }
+
+                remove ??= new List<CardView>();
+                remove.Add(pair.Key);
+            }
+
+            if (remove == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < remove.Count; i++)
+            {
+                _virtualDetails.Remove(remove[i]);
+            }
+        }
+
+        private Color ResolveChoiceOptionColor(ChoiceSession session)
+        {
+            return session.ChoiceKind switch
+            {
+                "RelicChoice" => _relicColor,
+                "StatUpgrade" => new Color(0.58f, 0.84f, 0.64f, 0.96f),
+                _ => _choiceColor
+            };
+        }
+
         private async Task WaitSeconds(float duration)
         {
             if (duration <= 0f)
@@ -1862,16 +2537,22 @@ namespace Game.Presentation.Runtime
             {
                 "NotAdjacent" => "只能移动到正交相邻的格子。",
                 "CellOccupied" => "目标格子被占据。",
+                "TargetCellNotEmpty" => "目标格子不是空位。",
                 "CardNotOnGrid" => "该卡牌不在桌面上。",
                 "NotPlayerAction" => "现在不是玩家行动回合。",
                 "InvalidTarget" => "无效的目标。",
                 "InventoryFull" => "道具栏已满。",
+                "ItemSlotEmpty" => "该道具栏位是空的。",
                 "NotEnoughGold" => "金币不足。",
                 "ItemNotFound" => "找不到该道具。",
+                "ItemCannotUse" => "当前还不能这样使用该道具。",
+                "TargetFaceDown" => "背面朝下的牌暂时不能作为目标。",
                 "RelicNotReady" => "遗物尚未就绪。",
+                "RelicCannotActivate" => "当前还不能发动这个主动遗物。",
                 "RoomNotCleared" => "房间尚未清理，无法选择路线。",
                 "NoRouteChoices" => "当前没有可选路线。",
                 "ChoiceAlreadyResolved" => "该选择已经做出。",
+                "InteractionRejectedByModel" => "这张卡现在不能这样互动。",
                 "RunAlreadyEnded" => "本局已经结束。",
                 _ => reason
             };
@@ -1897,6 +2578,18 @@ namespace Game.Presentation.Runtime
             {
                 view.RectTransform.DOScale(1f, 0.18f).SetEase(Ease.OutQuart);
             }
+        }
+
+        private readonly struct VirtualDetail
+        {
+            public VirtualDetail(string title, string body)
+            {
+                Title = title ?? string.Empty;
+                Body = body ?? string.Empty;
+            }
+
+            public string Title { get; }
+            public string Body { get; }
         }
     }
 

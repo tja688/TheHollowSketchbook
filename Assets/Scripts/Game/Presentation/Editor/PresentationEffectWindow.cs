@@ -41,13 +41,15 @@ namespace Game.Presentation.Editor
             RebuildCachedEditor();
         }
 
-        private void OnDisable()
+        protected override void OnDisable()
         {
             if (_cachedEditor != null)
             {
                 DestroyImmediate(_cachedEditor);
                 _cachedEditor = null;
             }
+
+            base.OnDisable();
         }
 
         protected override void OnImGUI()
