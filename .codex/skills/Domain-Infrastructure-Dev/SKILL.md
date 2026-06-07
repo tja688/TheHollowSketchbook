@@ -47,9 +47,9 @@ Legacy prototype flow such as `RunManager`, old map generation, and prototype pr
 1. Use code graph context or equivalent search to understand the current flow and callers.
 2. Compare against `Assets/Docs/深入地牢` when the task touches design rules.
 3. Identify impacted Content and Presentation contracts before editing.
-4. Add or update focused Domain tests first for behavior changes.
+4. Prefer compile-safe verification and explicit invariant documentation for behavior changes. Do not add Unity EditMode tests unless the user explicitly restores that workflow.
 5. Implement the smallest infrastructure change that preserves invariants.
-6. Run focused tests and relevant Core/EditMode tests.
+6. Verify with Unity compilation and targeted non-TestRunner checks only. Do not run Core/EditMode automated tests.
 7. If public API, event payloads, save DTOs, action ordering, or room flow changed, write an impact report under `Assets/Notes` unless another path is specified.
 8. Update Domain authority documentation and design correspondence.
 
@@ -74,3 +74,4 @@ If this is first-time documentation or the user says “重建”, rebuild from 
 | “Route choice is easier as a UI menu.” | Use route cards and `InteractWithCardIntent`. |
 | “This one item should count as an action.” | Forbidden unless latest design docs and a Domain task change the invariant. |
 | “Presentation needs this event, so I’ll play VFX here.” | Emit a domain event with payload; Presentation handles playback. |
+| “I can keep using EditMode tests for regression.” | Not in the current repo workflow. Validate by compilation unless the user explicitly re-enables automated tests. |

@@ -34,4 +34,5 @@ updatedAt: 1780661167644
 - This project currently uses `com.unity.test-framework` `1.1.33`; Unity’s own package docs for 1.1 state async tests are not supported, so EditMode tests that block on `Task` via `GetAwaiter().GetResult()` can freeze the editor when MCP auto-runs Test Runner.
 - When MCP package `com.coplaydev.unity-mcp` auto-runs tests, it installs `TestRunnerNoThrottle` and drives `UnityEditor.TestTools.TestRunner.EditModeRunner.TestConsumer` on `EditorApplication.update`; any test waiting for editor-frame progress from a synchronous `[Test]` body is a high-risk deadlock.
 - For this project, async/concurrency coverage in `Assets/Scripts/Game/Core/Tests/DomainP0Tests.cs` should use `[UnityTest]` plus `IEnumerator` frame pumping instead of synchronous `[Test]` wrappers around `Task` waits.
+- Repo policy changed on 2026-06-07: all game EditMode tests were removed/disabled, and AI validation is now compile-only. Do not trigger Unity Test Runner or MCP EditMode automation unless a human explicitly restores that workflow.
 <!-- locus:body:end -->

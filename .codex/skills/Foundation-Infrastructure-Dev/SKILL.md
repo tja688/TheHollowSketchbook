@@ -40,9 +40,9 @@ Domain-specific files under `Assets/Scripts/Game/Core/Runtime/Domain` are not Fo
 1. Confirm the user explicitly asked for Foundation work.
 2. Use code graph context or equivalent search to locate entry points, callers, and upper-layer consumers.
 3. Identify affected Domain, Content, Presentation, save, and test behavior before editing.
-4. Write or update tests before implementation when behavior changes.
+4. Prefer compile-safe verification artifacts and documentation updates. Do not add or depend on Unity EditMode automated tests unless the user explicitly restores that workflow.
 5. Make the smallest compatible change.
-6. Run focused tests, then the relevant Core/EditMode regression suite when available.
+6. Verify with Unity compilation and other non-TestRunner checks only. Do not run Core/EditMode automated tests.
 7. Produce an upper-layer impact report in `Assets/Notes` unless the user supplied another path.
 8. Update the Foundation authority documentation.
 
@@ -70,3 +70,4 @@ If this is the first document for the area or the user explicitly says “重建
 | “Compilation is easier if Core references Unity.” | Forbidden. Preserve `noEngineReferences: true`. |
 | “This random choice is only temporary.” | Use `IRng` / `DeterministicRng` or do not add it. |
 | “I can change save shape now and fix callers later.” | Forbidden without explicit migration and impact review. |
+| “I should run EditMode automation to be safe.” | Forbidden in the current repo workflow. Use compile-only verification unless the user explicitly changes policy. |

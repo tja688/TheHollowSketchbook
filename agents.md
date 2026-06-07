@@ -24,6 +24,12 @@ Original design documents live in `Assets/Docs/深入地牢`. Read them when the
 3. Prefer code graph tools for code discovery and impact analysis. Start with code graph context for architecture, flow, bug, or refactor questions when available.
 4. If the task is exploration, analysis, audit, review, alignment, or reporting and no output path is specified, write the report under `Assets/Notes`.
 
+## Validation Workflow
+
+- Do not run Unity Edit Mode tests or Test Runner automation for this repository unless the user explicitly asks to restore that workflow.
+- Default AI verification is compile-only: trigger Unity compilation and treat clean compilation / no compile errors as the validation gate.
+- If older notes or plans mention Core/EditMode regression suites, treat them as historical unless the user explicitly re-enables them.
+
 ## Routing Rules
 
 - If the task asks for model registry, RNG, save base, action queue, shared IDs, hooks, logging, asmdef boundaries, or cross-project technical behavior, use `Foundation-Infrastructure-Dev`.
