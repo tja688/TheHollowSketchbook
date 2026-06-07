@@ -104,9 +104,26 @@ namespace Game.Core.Domain
                 }
 
                 await _executor.ExecuteAllAsync().ConfigureAwait(false);
+
+                int loopGuard = 0;
                 while (_queue.Count > 0)
                 {
+                    int queueBeforeCount = _queue.Count;
                     await _executor.ExecuteAllAsync().ConfigureAwait(false);
+                    int queueAfterCount = _queue.Count;
+
+                    loopGuard++;
+                    if (loopGuard > 100)
+                    {
+                        throw new InvalidOperationException(
+                            $"Domain action queue did not drain. before={queueBeforeCount}, after={queueAfterCount}, current={_queue.Count}");
+                    }
+
+                    if (queueAfterCount >= queueBeforeCount && !_executor.IsRunning)
+                    {
+                        throw new InvalidOperationException(
+                            $"Domain action queue is stuck. before={queueBeforeCount}, after={queueAfterCount}");
+                    }
                 }
                 return _context.Batches.Count > beforeCount ? _context.Batches[_context.Batches.Count - 1] : null;
             }

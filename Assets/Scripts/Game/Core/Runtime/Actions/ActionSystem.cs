@@ -164,7 +164,7 @@ namespace Game.Core.Actions
             {
                 lock (_executionLock)
                 {
-                    return _runningTask != null;
+                    return _runningTask != null && !_runningTask.IsCompleted;
                 }
             }
         }
@@ -175,11 +175,23 @@ namespace Game.Core.Actions
             {
                 if (_runningTask != null)
                 {
-                    return _runningTask;
+                    if (!_runningTask.IsCompleted)
+                    {
+                        return _runningTask;
+                    }
+
+                    _runningTask = null;
                 }
 
-                _runningTask = RunAllAsync();
-                return _runningTask;
+                Task task = RunAllAsync();
+                _runningTask = task;
+
+                if (task.IsCompleted)
+                {
+                    _runningTask = null;
+                }
+
+                return task;
             }
         }
 

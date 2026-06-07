@@ -118,6 +118,12 @@ namespace Game.Presentation.Runtime
         private Component _combatCamera;
         private Component _choiceCamera;
         private Component _relicTargetCamera;
+        private LineRenderer _dragLine;
+        private bool _isDraggingPlayerCard;
+        private bool _dragThresholdExceeded;
+        private CardView _draggingCardView;
+        private CardInstance _draggingCard;
+        private int _dragHoveredCellIndex;
         private static TMP_FontAsset s_runtimeChineseFallback;
 
         public bool IsRunning => _isReady;
@@ -141,6 +147,7 @@ namespace Game.Presentation.Runtime
             EnsureBindings();
             EnsureRuntimeFontFallbacks();
             BuildGridLookup();
+            EnsureCellClickProxies();
             EnsureChoiceSlots();
             EnsureSimpleActionButtons();
             EnsureCameraBindings();
@@ -160,6 +167,7 @@ namespace Game.Presentation.Runtime
             _isReady = true;
             _isAnimating = false;
             _pendingBatches.Clear();
+            CancelDrag();
             CancelSelectionModes();
 
             EnsureInitialReveal();
@@ -167,6 +175,7 @@ namespace Game.Presentation.Runtime
             EnqueuePendingBatches();
             PlayQueuedBatchesIfIdle();
             RefreshSimpleUiState();
+            HideDragLine();
             ApplyCameraMode();
         }
 
@@ -191,6 +200,7 @@ namespace Game.Presentation.Runtime
 
             UpdateHoverDetail();
             HandleScrollShortcuts();
+            HandleDragUpdate();
             RefreshSimpleUiState();
             ApplyCameraMode();
         }
@@ -366,6 +376,15 @@ namespace Game.Presentation.Runtime
             if (_cancelSelectionLabel == null && _cancelSelectionButton != null)
             {
                 _cancelSelectionLabel = FindButtonLabel(_cancelSelectionButton.transform);
+            }
+
+            if (_dragLine == null)
+            {
+                Transform lrTransform = FindDescendantByNameContains(_uiRoot, "Line Renderer");
+                if (lrTransform != null)
+                {
+                    _dragLine = lrTransform.GetComponent<LineRenderer>();
+                }
             }
         }
 
@@ -701,6 +720,39 @@ namespace Game.Presentation.Runtime
 
                 _gridCanvasesByCell[i] = canvas;
                 _gridWorldPositionsByCell[i] = canvas.transform.position;
+            }
+        }
+
+        private void EnsureCellClickProxies()
+        {
+            if (_gridRoot == null)
+            {
+                return;
+            }
+
+            for (int i = 1; i <= 9; i++)
+            {
+                Transform child = _gridRoot.Find("格" + i);
+                if (child == null)
+                {
+                    continue;
+                }
+
+                Image bgImage = child.GetComponent<Image>();
+                if (bgImage == null)
+                {
+                    bgImage = child.gameObject.AddComponent<Image>();
+                    bgImage.color = new Color(0f, 0f, 0f, 0.01f);
+                    bgImage.raycastTarget = true;
+                }
+
+                GridCellClickProxy proxy = child.GetComponent<GridCellClickProxy>();
+                if (proxy == null)
+                {
+                    proxy = child.gameObject.AddComponent<GridCellClickProxy>();
+                }
+
+                proxy.Initialize(this, i);
             }
         }
 
@@ -1861,6 +1913,7 @@ namespace Game.Presentation.Runtime
             _pendingRelicId = default;
             _pendingTargetMode = ItemTargetMode.None;
             _pendingPrimaryCard = null;
+            CancelDrag();
             ClearAllHighlights();
         }
 
@@ -2310,6 +2363,232 @@ namespace Game.Presentation.Runtime
             }
         }
 
+        private const float DragThreshold = 12f;
+
+        private void HandleDragUpdate()
+        {
+            if (!_isReady || _isAnimating || _isChoosingChoice || _isChoosingTarget || _isChoosingRelicTarget)
+            {
+                if (_isDraggingPlayerCard)
+                {
+                    CancelDrag();
+                }
+
+                return;
+            }
+
+            if (_draggingCardView != null && _draggingCardView.IsPointerDown)
+            {
+                float distance = Vector2.Distance(
+                    (Vector2)UnityEngine.Input.mousePosition,
+                    _draggingCardView.PointerDownScreenPosition);
+                if (distance > DragThreshold && !_dragThresholdExceeded)
+                {
+                    _dragThresholdExceeded = true;
+                    _isDraggingPlayerCard = true;
+                    if (_hoveredView == _draggingCardView)
+                    {
+                        NotifyHoverExit(_draggingCardView);
+                    }
+                }
+            }
+            else if (_isDraggingPlayerCard)
+            {
+                OnPlayerCardDragReleased();
+                return;
+            }
+
+            if (!_isDraggingPlayerCard || _draggingCardView == null)
+            {
+                return;
+            }
+
+            UpdateDragLine();
+            int newHoveredCell = GetCellIndexAtScreenPosition(UnityEngine.Input.mousePosition);
+            if (newHoveredCell != _dragHoveredCellIndex)
+            {
+                if (_dragHoveredCellIndex > 0)
+                {
+                    HighlightCell(_dragHoveredCellIndex, _idleOutlineColor);
+                }
+
+                _dragHoveredCellIndex = newHoveredCell;
+                if (_dragHoveredCellIndex > 0)
+                {
+                    if (IsCellValidDragTarget(_dragHoveredCellIndex))
+                    {
+                        HighlightCell(_dragHoveredCellIndex, _previewValidColor);
+                    }
+                    else
+                    {
+                        HighlightCell(_dragHoveredCellIndex, _previewInvalidColor);
+                    }
+                }
+            }
+        }
+
+        private void UpdateDragLine()
+        {
+            if (_dragLine == null || _draggingCardView == null)
+            {
+                return;
+            }
+
+            _dragLine.gameObject.SetActive(true);
+            _dragLine.positionCount = 2;
+            _dragLine.SetPosition(0, _draggingCardView.transform.position);
+
+            if (Camera.main != null)
+            {
+                Ray ray = Camera.main.ScreenPointToRay(UnityEngine.Input.mousePosition);
+                Plane cardPlane = new Plane(Vector3.up, _draggingCardView.transform.position);
+                if (cardPlane.Raycast(ray, out float enter))
+                {
+                    _dragLine.SetPosition(1, ray.GetPoint(enter));
+                }
+                else
+                {
+                    _dragLine.SetPosition(1, ray.GetPoint(5f));
+                }
+            }
+        }
+
+        private void HideDragLine()
+        {
+            if (_dragLine != null)
+            {
+                _dragLine.gameObject.SetActive(false);
+            }
+        }
+
+        private bool IsCellValidDragTarget(int cellIndex)
+        {
+            if (_context == null || _context.Grid == null)
+            {
+                return false;
+            }
+
+            GridCoord coord = GridCoord.FromCellIndex(cellIndex);
+            CardInstance topCard = _context.Grid.GetTopCard(coord);
+            if (topCard == null)
+            {
+                return true;
+            }
+
+            if (topCard.CardType == CardType.Player)
+            {
+                return false;
+            }
+
+            return topCard.IsFaceUp;
+        }
+
+        private async void OnPlayerCardDragReleased()
+        {
+            CardView dragView = _draggingCardView;
+            int targetCell = _dragHoveredCellIndex;
+            CancelDrag();
+
+            if (targetCell < 1 || _facade == null)
+            {
+                return;
+            }
+
+            if (dragView != null)
+            {
+                dragView.MarkDragHandled();
+            }
+
+            GridCoord coord = GridCoord.FromCellIndex(targetCell);
+            CardInstance topCard = _context.Grid.GetTopCard(coord);
+
+            if (topCard != null && topCard.CardType != CardType.Player && topCard.IsFaceUp)
+            {
+                if (topCard.CardType == CardType.Item)
+                {
+                    DomainEventBatch storeBatch = await _facade.SubmitIntentAsync(new StoreItemIntent(topCard.InstanceId));
+                    HandleSubmittedBatch(storeBatch);
+                }
+                else
+                {
+                    DomainEventBatch interactBatch = await _facade.SubmitIntentAsync(new InteractWithCardIntent(topCard.InstanceId));
+                    HandleSubmittedBatch(interactBatch);
+                }
+
+                return;
+            }
+
+            if (topCard == null)
+            {
+                DomainEventBatch moveBatch = await _facade.SubmitIntentAsync(new MovePlayerIntent(coord));
+                HandleSubmittedBatch(moveBatch);
+            }
+        }
+
+        private void CancelDrag()
+        {
+            _isDraggingPlayerCard = false;
+            _dragThresholdExceeded = false;
+            _draggingCardView = null;
+            _draggingCard = null;
+            HideDragLine();
+            if (_dragHoveredCellIndex > 0)
+            {
+                HighlightCell(_dragHoveredCellIndex, _idleOutlineColor);
+            }
+
+            _dragHoveredCellIndex = 0;
+            if (!_isChoosingTarget && !_isChoosingRelicTarget)
+            {
+                ClearAllHighlights();
+            }
+        }
+
+        private int GetCellIndexAtScreenPosition(Vector2 screenPos)
+        {
+            if (Camera.main == null)
+            {
+                return 0;
+            }
+
+            foreach (KeyValuePair<int, Canvas> pair in _gridCanvasesByCell)
+            {
+                RectTransform rect = pair.Value.transform as RectTransform;
+                if (rect == null)
+                {
+                    continue;
+                }
+
+                Camera eventCamera = pair.Value.worldCamera != null ? pair.Value.worldCamera : Camera.main;
+                if (RectTransformUtility.RectangleContainsScreenPoint(rect, screenPos, eventCamera))
+                {
+                    return pair.Key;
+                }
+            }
+
+            return 0;
+        }
+
+        public void NotifyPointerDownOnCard(CardView view)
+        {
+            if (!_isReady || _isAnimating || _isChoosingChoice || _isChoosingTarget || _isChoosingRelicTarget || view == null)
+            {
+                return;
+            }
+
+            if (!TryGetBackingCard(view, out CardInstance card))
+            {
+                return;
+            }
+
+            if (card.CardType == CardType.Player && card.Zone == CardZone.Grid)
+            {
+                _draggingCardView = view;
+                _draggingCard = card;
+                _dragThresholdExceeded = false;
+            }
+        }
+
         private void HandleScrollShortcuts()
         {
             float delta = UnityEngine.Input.mouseScrollDelta.y;
@@ -2329,8 +2608,15 @@ namespace Game.Presentation.Runtime
                 return;
             }
 
-            if (_isChoosingChoice || _isChoosingRelicTarget)
+            if (_isChoosingChoice)
             {
+                return;
+            }
+
+            if (_isChoosingRelicTarget)
+            {
+                _preferCombatCamera = !_preferCombatCamera;
+                ApplyCameraMode();
                 return;
             }
 
@@ -2593,7 +2879,7 @@ namespace Game.Presentation.Runtime
         }
     }
 
-    public sealed class CardView : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
+    public sealed class CardView : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
     {
         [SerializeField] private Image _background;
         [SerializeField] private TextMeshProUGUI _titleText;
@@ -2605,8 +2891,14 @@ namespace Game.Presentation.Runtime
         private DomainPresentationController _controller;
         private Action _onClick;
 
+        private bool _isPointerDown;
+        private Vector2 _pointerDownScreenPosition;
+        private bool _dragWasHandled;
+
         public RectTransform RectTransform { get; private set; }
         public CanvasGroup CanvasGroup { get; private set; }
+        public bool IsPointerDown => _isPointerDown;
+        public Vector2 PointerDownScreenPosition => _pointerDownScreenPosition;
 
         public void Initialize(DomainPresentationController controller)
         {
@@ -2818,6 +3110,12 @@ namespace Game.Presentation.Runtime
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            if (_dragWasHandled)
+            {
+                _dragWasHandled = false;
+                return;
+            }
+
             if (_onClick != null)
             {
                 _onClick();
@@ -2825,6 +3123,25 @@ namespace Game.Presentation.Runtime
             }
 
             _controller?.OnCardClicked(this);
+        }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            if (eventData.button == PointerEventData.InputButton.Left)
+            {
+                _isPointerDown = true;
+                _pointerDownScreenPosition = eventData.position;
+                _dragWasHandled = false;
+                _controller?.NotifyPointerDownOnCard(this);
+            }
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (eventData.button == PointerEventData.InputButton.Left)
+            {
+                _isPointerDown = false;
+            }
         }
 
         public void OnPointerEnter(PointerEventData eventData)
@@ -2835,6 +3152,11 @@ namespace Game.Presentation.Runtime
         public void OnPointerExit(PointerEventData eventData)
         {
             _controller?.NotifyHoverExit(this);
+        }
+
+        public void MarkDragHandled()
+        {
+            _dragWasHandled = true;
         }
     }
 
