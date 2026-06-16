@@ -1,0 +1,4 @@
+CodeGraph Error Log - 2026-06-06T06:19:34.245Z
+1 files with errors
+
+Assets/Plugins/Feel/NiceVibrations/Plugins/iOS/LofeltHaptics.framework/Headers/LofeltHaptics.h: Failed to get parser for language: objc
