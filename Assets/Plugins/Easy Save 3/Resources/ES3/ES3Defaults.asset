@@ -33,9 +33,6 @@ MonoBehaviour:
     - Assembly-CSharp
     - Assembly-CSharp-firstpass
     - Cinemachine
-    - Game.Content
-    - Game.Core
-    - Game.Presentation
     - GLTFSerialization
     - Lofelt.NiceVibrations
     - Lofelt.NiceVibrations.Demo
