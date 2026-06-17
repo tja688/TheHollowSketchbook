@@ -188,7 +188,7 @@ Shader "Hidden/CardDungeon/RetroComposite"
                 col = lerp(col, ClosestRetroPalette(col), paletteMask * _PaletteStrength);
 
                 float scan = (fmod(pixel.y, 2.0) < 1.0) ? 1.0 : (1.0 - _ScanlineStrength);
-                float fineScan = 0.90 + 0.10 * sin((uv.y * _ScreenParams.y) * 3.14159265);
+                float fineScan = lerp(1.0, 0.90 + 0.10 * sin((uv.y * _ScreenParams.y) * 3.14159265), _ScanlineStrength);
                 col *= scan * fineScan;
 
                 float dist = length(center);

@@ -129,24 +129,15 @@ Shader "CardDungeon/RetroFakeLit"
                 uint pixelLightCount = GetAdditionalLightsCount();
                 for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
                 {
+                    #if defined(_ADDITIONAL_LIGHT_SHADOWS)
+                    Light light = GetAdditionalLight(lightIndex, positionWS, half4(1, 1, 1, 1));
+                    #else
                     Light light = GetAdditionalLight(lightIndex, positionWS);
+                    #endif
                     half addNdotL = saturate(dot(normalWS, light.direction));
                     half addWrapped = saturate(lerp(addNdotL, addNdotL * 0.5h + 0.5h, _LightWrap));
-                    half addLit = QuantizeLight(addWrapped) * light.distanceAttenuation;
-                    half addShadow = light.shadowAttenuation;
-                    half3 addLightColor = lerp(_ShadowColor.rgb, light.color, addShadow);
-                    color += addLightColor * addLit * addShadow;
-                }
-                #elif defined(_ADDITIONAL_LIGHT_SHADOWS)
-                uint shadowLightCount = GetAdditionalLightsCount();
-                for (uint shadowLightIndex = 0u; shadowLightIndex < shadowLightCount; ++shadowLightIndex)
-                {
-                    Light light = GetAdditionalLight(shadowLightIndex, positionWS);
-                    half addNdotL = saturate(dot(normalWS, light.direction));
-                    half addWrapped = saturate(lerp(addNdotL, addNdotL * 0.5h + 0.5h, _LightWrap));
-                    half addLit = QuantizeLight(addWrapped) * light.distanceAttenuation;
-                    half addShadow = light.shadowAttenuation;
-                    color = lerp(color, _ShadowColor.rgb, (1.0h - addShadow) * addLit);
+                    half addLit = QuantizeLight(addWrapped) * light.distanceAttenuation * light.shadowAttenuation;
+                    color += light.color * addLit;
                 }
                 #endif
 

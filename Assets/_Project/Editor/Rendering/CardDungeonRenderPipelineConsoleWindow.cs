@@ -1125,7 +1125,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
 
             section.Add(CreateFloatControl(
                 "Scanline Strength",
-                "扫描线。调大：条纹更明显；调小：更接近你设计里“不要强扫描线”的方向。",
+                "扫描线（含细扫描纹）。调大：条纹更明显；调到 0 时应完全无横纹。",
                 0f, 1f,
                 () => GetMaterialFloat(config.retroCompositeMaterial, "_ScanlineStrength"),
                 value => SetMaterialFloat(config.retroCompositeMaterial, "_ScanlineStrength", value, "Change Scanline Strength")));

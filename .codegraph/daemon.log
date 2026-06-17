@@ -579,3 +579,9 @@
 [CodeGraph daemon] socket error: write EPIPE
 [CodeGraph MCP] Caught up 2761 file(s) changed since last run
 [CodeGraph MCP] Auto-synced 1 file(s) in 504ms
+[CodeGraph MCP] Auto-synced 4 file(s) in 740ms
+[CodeGraph MCP] Auto-synced 2 file(s) in 625ms
+[CodeGraph MCP] Auto-synced 3 file(s) in 570ms
+[CodeGraph MCP] Auto-synced 2 file(s) in 681ms
+[CodeGraph MCP] Auto-synced 2 file(s) in 660ms
+[CodeGraph MCP] Auto-synced 2 file(s) in 642ms
