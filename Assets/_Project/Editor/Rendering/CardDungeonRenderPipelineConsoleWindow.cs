@@ -132,7 +132,17 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 config.presets = new List<RetroRenderPreset>();
                 dirty = true;
             }
-            if (RetroRenderPreset.SyncPresetList(config))
+            if (config.ghostBlueLut == null)
+            {
+                config.ghostBlueLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_GhostBlue.asset");
+                dirty = true;
+            }
+            if (config.mysticPurpleLut == null)
+            {
+                config.mysticPurpleLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_MysticPurple.asset");
+                dirty = true;
+            }
+            if (RetroRenderPresetEditorUtility.SyncPresetList(config))
             {
                 dirty = true;
             }
@@ -389,9 +399,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                     if (preset == null) continue;
                     section.Add(new Button(() =>
                     {
-                        preset.Apply(config.retroPosterizeThresholdMaterial, config.retroCompositeMaterial,
-                            config.highFidelityRenderer, config.globalVolumeProfile,
-                            PosterizeFeatureName, CompositeFeatureName);
+                        RetroRenderPresetEditorUtility.ApplyPreset(preset, config, PosterizeFeatureName, CompositeFeatureName, GetRetroFakeLitMaterials());
                         RefreshPage();
                     })
                     {
@@ -560,6 +568,18 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 RefreshPage();
             })),
             ("Ping 材质文件夹", (Action)(() => PingObject(config.retroFakeLitMaterialFolder))),
+        }));
+
+        contentScroll.Add(CreateSectionCard("选中材质模板", "先在 Project 里选材质，或在 Hierarchy 里选带 Renderer 的物体，再点这里。模板只改 RetroFakeLit 参数，不会切到现代 PBR。", section =>
+        {
+            section.Add(CreateButtonRow(new[]
+            {
+                ("木质", (Action)(() => ApplyMaterialTemplateToSelection(RetroFakeLitMaterialTemplateKind.Wood))),
+                ("铁质", (Action)(() => ApplyMaterialTemplateToSelection(RetroFakeLitMaterialTemplateKind.Iron))),
+                ("银质", (Action)(() => ApplyMaterialTemplateToSelection(RetroFakeLitMaterialTemplateKind.Silver))),
+                ("金质", (Action)(() => ApplyMaterialTemplateToSelection(RetroFakeLitMaterialTemplateKind.Gold))),
+            }));
+            section.Add(CreateChecklistLabel("模板会保留当前 RetroFakeLit 渲染路径，只改 BaseColor、高光颜色/强度/锐度、量化强度等可辨材质参数。"));
         }));
 
         contentScroll.Add(CreateSectionCard("共有光照参数", "这些参数几乎决定了“现代 PBR 味”会不会被压掉。", section =>
@@ -775,6 +795,16 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 SetMaterialTexture(config.retroPosterizeThresholdMaterial, "_UserLut", config.candleRedLut, "Set CandleRed LUT");
                 RefreshPage();
             })),
+            ("切 LUT：GhostBlue", (Action)(() =>
+            {
+                SetMaterialTexture(config.retroPosterizeThresholdMaterial, "_UserLut", config.ghostBlueLut, "Set GhostBlue LUT");
+                RefreshPage();
+            })),
+            ("切 LUT：MysticPurple", (Action)(() =>
+            {
+                SetMaterialTexture(config.retroPosterizeThresholdMaterial, "_UserLut", config.mysticPurpleLut, "Set MysticPurple LUT");
+                RefreshPage();
+            })),
         }));
 
         contentScroll.Add(CreateSectionCard("Pass 开关", "先别急着调数值。先确定是不是这层在主导画面风格。", section =>
@@ -792,7 +822,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         {
             section.Add(CreateObjectFieldControl(
                 "User LUT",
-                "暗部参考调色板。DirtyBrown 更容易把画面推向脏棕黄；DarkGreen 更阴冷；CandleRed 更偏血色烛光。",
+                "暗部参考调色板。DirtyBrown 更容易把画面推向脏棕黄；DarkGreen 更阴冷；GhostBlue 更幽蓝；MysticPurple 更神秘。",
                 typeof(Texture2D),
                 () => config.retroPosterizeThresholdMaterial.GetTexture("_UserLut"),
                 value => SetMaterialTexture(config.retroPosterizeThresholdMaterial, "_UserLut", value as Texture2D, "Change Phase07 LUT")));
@@ -1724,6 +1754,23 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
         RepaintViews();
     }
 
+    private void ApplyMaterialTemplateToSelection(RetroFakeLitMaterialTemplateKind kind)
+    {
+        int changedCount = RetroFakeLitMaterialTemplates.ApplyToSelection(kind);
+        if (changedCount == 0)
+        {
+            Debug.LogWarning($"没有在当前选择中找到 CardDungeon/RetroFakeLit 材质，无法应用 {kind} 模板。");
+        }
+        else
+        {
+            Debug.Log($"已将 {changedCount} 个 RetroFakeLit 材质设置为 {kind} 模板。");
+            AssetDatabase.SaveAssets();
+        }
+
+        RefreshPage();
+        RepaintViews();
+    }
+
     private ScriptableRendererFeature FindRendererFeature(string featureName)
     {
         if (config == null || config.highFidelityRenderer == null)
@@ -1825,9 +1872,9 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
 
         contentScroll.Add(CreateButtonRow(new[]
         {
-            ("生成/刷新四组默认预设", (Action)(() =>
+            ("生成/刷新官方与黑暗风预设", (Action)(() =>
             {
-                RetroRenderPreset.GenerateOrUpdateDefaultPresets(config);
+                RetroRenderPresetEditorUtility.GenerateOrUpdateDefaultPresets(config);
                 RefreshPage();
             })),
             ("保存当前为新预设", (Action)(() =>
@@ -1835,15 +1882,21 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 string path = EditorUtility.SaveFilePanelInProject("保存预设", "Retro_Custom", "asset", "选择保存位置", RetroRenderPreset.PresetFolderPath);
                 if (!string.IsNullOrEmpty(path))
                 {
-                    RetroRenderPreset.CaptureCurrentToAsset(path, System.IO.Path.GetFileNameWithoutExtension(path), config,
-                        PosterizeFeatureName, CompositeFeatureName);
+                    RetroRenderPresetEditorUtility.CaptureCurrentToAsset(path, System.IO.Path.GetFileNameWithoutExtension(path), config,
+                        PosterizeFeatureName, CompositeFeatureName, GetRetroFakeLitMaterials());
                     RefreshPage();
                 }
             })),
+            ("封档当前对味暗红", (Action)(() =>
+            {
+                RetroRenderPresetEditorUtility.CaptureCurrentToAsset(RetroRenderPreset.LockedDarkRedPresetPath, "Retro_CurrentDarkRed_Locked", config,
+                    PosterizeFeatureName, CompositeFeatureName, GetRetroFakeLitMaterials());
+                RefreshPage();
+            })),
             ("封档当前核心效果", (Action)(() =>
             {
-                RetroRenderPreset.CaptureCurrentToAsset(RetroRenderPreset.ArchivePresetPath, "Retro_Archive_Current", config,
-                    PosterizeFeatureName, CompositeFeatureName);
+                RetroRenderPresetEditorUtility.CaptureCurrentToAsset(RetroRenderPreset.ArchivePresetPath, "Retro_Archive_Current", config,
+                    PosterizeFeatureName, CompositeFeatureName, GetRetroFakeLitMaterials());
                 RefreshPage();
             })),
         }));
@@ -1868,9 +1921,7 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 if (preset == null) continue;
                 section.Add(new Button(() =>
                 {
-                    preset.Apply(config.retroPosterizeThresholdMaterial, config.retroCompositeMaterial,
-                        config.highFidelityRenderer, config.globalVolumeProfile,
-                        PosterizeFeatureName, CompositeFeatureName);
+                    RetroRenderPresetEditorUtility.ApplyPreset(preset, config, PosterizeFeatureName, CompositeFeatureName, GetRetroFakeLitMaterials());
                     RefreshPage();
                 })
                 {

@@ -57,6 +57,14 @@ public sealed class CardDungeonRenderPipelineConsoleConfig : ScriptableObject
     [PreviewField(70, ObjectFieldAlignment.Left), AssetsOnly]
     public Texture2D candleRedLut;
 
+    [TitleGroup("Phase 07 LUT")]
+    [PreviewField(70, ObjectFieldAlignment.Left), AssetsOnly]
+    public Texture2D ghostBlueLut;
+
+    [TitleGroup("Phase 07 LUT")]
+    [PreviewField(70, ObjectFieldAlignment.Left), AssetsOnly]
+    public Texture2D mysticPurpleLut;
+
     [TitleGroup("核心资产")]
     [Required, AssetsOnly]
     public VolumeProfile globalVolumeProfile;
@@ -79,10 +87,12 @@ public sealed class CardDungeonRenderPipelineConsoleConfig : ScriptableObject
         dirtyBrownLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_DirtyBrown.asset");
         darkGreenLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_DarkGreen.asset");
         candleRedLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_CandleRed.asset");
+        ghostBlueLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_GhostBlue.asset");
+        mysticPurpleLut = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Rendering/Textures/PosterizeLUT/T_LUT_MysticPurple.asset");
         globalVolumeProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>("Assets/Settings/SampleSceneProfile.asset");
 
         if (presets == null) presets = new List<RetroRenderPreset>();
-        RetroRenderPreset.SyncPresetList(this);
+        RetroRenderPresetEditorUtility.SyncPresetList(this);
 
         EditorUtility.SetDirty(this);
     }

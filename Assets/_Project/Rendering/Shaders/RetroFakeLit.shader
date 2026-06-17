@@ -43,6 +43,8 @@ Shader "CardDungeon/RetroFakeLit"
             #pragma fragment Frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -172,6 +174,313 @@ Shader "CardDungeon/RetroFakeLit"
                 float fog = saturate((distanceToCamera - _FogStart) / max(0.001, _FogEnd - _FogStart));
                 color = lerp(color, _FogColor.rgb, fog);
                 return half4(saturate(color), 1.0h);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode"="ShadowCaster" }
+
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex ShadowVert
+            #pragma fragment ShadowFrag
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+
+            TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_EmissionMap); SAMPLER(sampler_EmissionMap);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _EmissionMap_ST;
+                half4 _BaseColor;
+                half _LightWrap;
+                half4 _ShadowColor;
+                half _AmbientStrength;
+                half4 _SpecColor;
+                half _SpecStrength;
+                half _SpecPower;
+                half _RampSteps;
+                half _RampStrength;
+                half4 _FogColor;
+                float _FogStart;
+                float _FogEnd;
+                half4 _EmissionColor;
+                half _EmissionStrength;
+                half _UseRoundedClip;
+                float _CardAspect;
+                float _CornerRadius;
+                float _EdgeSoftness;
+                float _EdgeDarkenWidth;
+                half _EdgeDarkenStrength;
+            CBUFFER_END
+
+            float3 _LightDirection;
+            float3 _LightPosition;
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            float RoundedRectSDF(float2 uv, float aspect, float radius)
+            {
+                float safeAspect = max(aspect, 0.001);
+                float2 halfSize = float2(safeAspect, 1.0) * 0.5;
+                float safeRadius = max(0.0, min(radius, min(halfSize.x, halfSize.y) - 0.0001));
+                float2 p = (uv - 0.5) * float2(safeAspect, 1.0);
+                float2 q = abs(p) - (halfSize - safeRadius);
+                return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - safeRadius;
+            }
+
+            void ClipRounded(float2 uv)
+            {
+                if (_UseRoundedClip > 0.5h)
+                {
+                    float roundedDistance = RoundedRectSDF(uv, _CardAspect, _CornerRadius);
+                    float roundedMask = 1.0 - smoothstep(0.0, max(_EdgeSoftness, 0.0001), roundedDistance);
+                    clip(roundedMask - 0.001);
+                }
+            }
+
+            float4 GetShadowPositionHClip(Attributes input)
+            {
+                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+                #if defined(_CASTING_PUNCTUAL_LIGHT_SHADOW)
+                    float3 lightDirectionWS = normalize(_LightPosition - positionWS);
+                #else
+                    float3 lightDirectionWS = _LightDirection;
+                #endif
+                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+                #if UNITY_REVERSED_Z
+                    positionCS.z = min(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #else
+                    positionCS.z = max(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #endif
+                return positionCS;
+            }
+
+            Varyings ShadowVert(Attributes input)
+            {
+                Varyings output;
+                output.positionCS = GetShadowPositionHClip(input);
+                output.uv = input.uv;
+                return output;
+            }
+
+            half4 ShadowFrag(Varyings input) : SV_Target
+            {
+                ClipRounded(input.uv);
+                return 0;
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DepthOnly"
+            Tags { "LightMode"="DepthOnly" }
+
+            ZWrite On
+            ColorMask 0
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex DepthVert
+            #pragma fragment DepthFrag
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_EmissionMap); SAMPLER(sampler_EmissionMap);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _EmissionMap_ST;
+                half4 _BaseColor;
+                half _LightWrap;
+                half4 _ShadowColor;
+                half _AmbientStrength;
+                half4 _SpecColor;
+                half _SpecStrength;
+                half _SpecPower;
+                half _RampSteps;
+                half _RampStrength;
+                half4 _FogColor;
+                float _FogStart;
+                float _FogEnd;
+                half4 _EmissionColor;
+                half _EmissionStrength;
+                half _UseRoundedClip;
+                float _CardAspect;
+                float _CornerRadius;
+                float _EdgeSoftness;
+                float _EdgeDarkenWidth;
+                half _EdgeDarkenStrength;
+            CBUFFER_END
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
+            float RoundedRectSDF(float2 uv, float aspect, float radius)
+            {
+                float safeAspect = max(aspect, 0.001);
+                float2 halfSize = float2(safeAspect, 1.0) * 0.5;
+                float safeRadius = max(0.0, min(radius, min(halfSize.x, halfSize.y) - 0.0001));
+                float2 p = (uv - 0.5) * float2(safeAspect, 1.0);
+                float2 q = abs(p) - (halfSize - safeRadius);
+                return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - safeRadius;
+            }
+
+            void ClipRounded(float2 uv)
+            {
+                if (_UseRoundedClip > 0.5h)
+                {
+                    float roundedDistance = RoundedRectSDF(uv, _CardAspect, _CornerRadius);
+                    float roundedMask = 1.0 - smoothstep(0.0, max(_EdgeSoftness, 0.0001), roundedDistance);
+                    clip(roundedMask - 0.001);
+                }
+            }
+
+            Varyings DepthVert(Attributes input)
+            {
+                Varyings output;
+                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                output.uv = input.uv;
+                return output;
+            }
+
+            half4 DepthFrag(Varyings input) : SV_Target
+            {
+                ClipRounded(input.uv);
+                return 0;
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DepthNormals"
+            Tags { "LightMode"="DepthNormals" }
+
+            ZWrite On
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex DepthNormalsVert
+            #pragma fragment DepthNormalsFrag
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_EmissionMap); SAMPLER(sampler_EmissionMap);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _EmissionMap_ST;
+                half4 _BaseColor;
+                half _LightWrap;
+                half4 _ShadowColor;
+                half _AmbientStrength;
+                half4 _SpecColor;
+                half _SpecStrength;
+                half _SpecPower;
+                half _RampSteps;
+                half _RampStrength;
+                half4 _FogColor;
+                float _FogStart;
+                float _FogEnd;
+                half4 _EmissionColor;
+                half _EmissionStrength;
+                half _UseRoundedClip;
+                float _CardAspect;
+                float _CornerRadius;
+                float _EdgeSoftness;
+                float _EdgeDarkenWidth;
+                half _EdgeDarkenStrength;
+            CBUFFER_END
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                half3 normalWS : TEXCOORD0;
+                float2 uv : TEXCOORD1;
+            };
+
+            float RoundedRectSDF(float2 uv, float aspect, float radius)
+            {
+                float safeAspect = max(aspect, 0.001);
+                float2 halfSize = float2(safeAspect, 1.0) * 0.5;
+                float safeRadius = max(0.0, min(radius, min(halfSize.x, halfSize.y) - 0.0001));
+                float2 p = (uv - 0.5) * float2(safeAspect, 1.0);
+                float2 q = abs(p) - (halfSize - safeRadius);
+                return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - safeRadius;
+            }
+
+            void ClipRounded(float2 uv)
+            {
+                if (_UseRoundedClip > 0.5h)
+                {
+                    float roundedDistance = RoundedRectSDF(uv, _CardAspect, _CornerRadius);
+                    float roundedMask = 1.0 - smoothstep(0.0, max(_EdgeSoftness, 0.0001), roundedDistance);
+                    clip(roundedMask - 0.001);
+                }
+            }
+
+            Varyings DepthNormalsVert(Attributes input)
+            {
+                Varyings output;
+                VertexPositionInputs positionInputs = GetVertexPositionInputs(input.positionOS.xyz);
+                VertexNormalInputs normalInputs = GetVertexNormalInputs(input.normalOS);
+                output.positionCS = positionInputs.positionCS;
+                output.normalWS = normalInputs.normalWS;
+                output.uv = input.uv;
+                return output;
+            }
+
+            half4 DepthNormalsFrag(Varyings input) : SV_Target
+            {
+                ClipRounded(input.uv);
+                half3 normalWS = normalize(input.normalWS);
+                return half4(normalWS * 0.5h + 0.5h, 1.0h);
             }
             ENDHLSL
         }

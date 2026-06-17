@@ -1202,10 +1202,10 @@ Light:
   m_InnerSpotAngle: 23.740091
   m_CookieSize: 10
   m_Shadows:
-    m_Type: 0
+    m_Type: 2
     m_Resolution: -1
     m_CustomResolution: -1
-    m_Strength: 1
+    m_Strength: 0.25
     m_Bias: 0.05
     m_NormalBias: 0.4
     m_NearPlane: 0.2
@@ -1295,7 +1295,7 @@ SphereCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 404169229}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 1748776956}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1317,6 +1317,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 404169229}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!134 &475082581
+PhysicMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  dynamicFriction: 0.6
+  staticFriction: 0.6
+  bounciness: 0
+  frictionCombine: 0
+  bounceCombine: 0
 --- !u!1001 &495858725
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2557,10 +2569,10 @@ Light:
   m_InnerSpotAngle: 23.740091
   m_CookieSize: 10
   m_Shadows:
-    m_Type: 0
+    m_Type: 2
     m_Resolution: -1
     m_CustomResolution: -1
-    m_Strength: 1
+    m_Strength: 0.35
     m_Bias: 0.05
     m_NormalBias: 0.4
     m_NearPlane: 0.2
@@ -2650,7 +2662,7 @@ SphereCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1134354219}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 475082581}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -3278,10 +3290,10 @@ Light:
   m_InnerSpotAngle: 30.387707
   m_CookieSize: 10
   m_Shadows:
-    m_Type: 0
+    m_Type: 2
     m_Resolution: -1
     m_CustomResolution: -1
-    m_Strength: 1
+    m_Strength: 0.2
     m_Bias: 0.05
     m_NormalBias: 0.4
     m_NearPlane: 0.2
@@ -3371,7 +3383,7 @@ SphereCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1497387766}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 1670747740}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -3402,6 +3414,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1510481819}
+  - component: {fileID: 1510481820}
+  - component: {fileID: 1510481821}
   m_Layer: 0
   m_Name: Lights&RenderSettings
   m_TagString: Untagged
@@ -3433,6 +3447,60 @@ Transform:
   - {fileID: 1959286320}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1510481820
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1510481818}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e4076ee0e049c344be31fbb7226a25a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  phase07Material: {fileID: 2100000, guid: 8afc215a9dc8f6e489b22fc0248b866a, type: 2}
+  phase08Material: {fileID: 2100000, guid: 49f15f9fbe696504fb29b48eda2db235, type: 2}
+  volumeProfile: {fileID: 11400000, guid: a6560a915ef98420e9faacc1c7438823, type: 2}
+  collectSceneRetroFakeLitMaterials: 1
+  retroFakeLitMaterials: []
+  retroFakeLitRenderers: []
+  lightRoles:
+  - roleName: TableWarmLight
+    light: {fileID: 1134354221}
+  - roleName: TableWarmLight (1)
+    light: {fileID: 404169232}
+  - roleName: playerlight
+    light: {fileID: 1497387769}
+--- !u!114 &1510481821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1510481818}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a93c086f19c1a8a479aa9b26318f7f77, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  preset: {fileID: 11400000, guid: 5f437349cb91438bb5daa63d8326fd99, type: 2}
+  targets: {fileID: 1510481820}
+  applyOnAwake: 1
+  applyOnEnable: 0
+  logAppliedPreset: 0
+--- !u!134 &1670747740
+PhysicMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  dynamicFriction: 0.6
+  staticFriction: 0.6
+  bounciness: 0
+  frictionCombine: 0
+  bounceCombine: 0
 --- !u!1001 &1717711183
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3616,6 +3684,18 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1718155717}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!134 &1748776956
+PhysicMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  dynamicFriction: 0.6
+  staticFriction: 0.6
+  bounciness: 0
+  frictionCombine: 0
+  bounceCombine: 0
 --- !u!1 &1754561561
 GameObject:
   m_ObjectHideFlags: 0
@@ -4795,12 +4875,12 @@ PrefabInstance:
     - target: {fileID: 2783695616173408232, guid: f075999fe28d14c4eada7cc10658cd2f,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.619
+      value: 0.614
       objectReference: {fileID: 0}
     - target: {fileID: 2783695616173408232, guid: f075999fe28d14c4eada7cc10658cd2f,
         type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.163
+      value: 0.408
       objectReference: {fileID: 0}
     - target: {fileID: 2783695616173408232, guid: f075999fe28d14c4eada7cc10658cd2f,
         type: 3}

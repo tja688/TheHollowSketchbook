@@ -1,0 +1,88 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0196d3d91f624de4e8805e2e3dd5450d, type: 3}
+  m_Name: Retro_ShadeGreen
+  m_EditorClassIdentifier: 
+  phase07FeatureActive: 1
+  lut: {fileID: 2800000, guid: f8858d08268926449b49dbb49472dd18, type: 2}
+  contribution: 0.42
+  threshold: 0.43
+  thresholdSharpness: 8
+  lutStrength: 0.85
+  phase08FeatureActive: 1
+  virtualWidth: 1920
+  virtualHeight: 1080
+  pixelate: 0.818
+  posterizeLevels: 10.28
+  posterizeStrength: 0.32
+  paletteStrength: 0.24
+  paletteDarkThreshold: 0.38
+  ditherStrength: 0
+  blackCrush: 0.06
+  contrast: 1.22
+  saturation: 0.86
+  vignetteStrength: 0.58
+  vignetteRadius: 0.74
+  scanlineStrength: 0
+  chromaticAberration: 0.311
+  noiseStrength: 0
+  crtCurvature: 0
+  crtEdgeSoftness: 0.0227
+  crtGlowBleed: 0.053
+  horizontalJitter: 0
+  warmTint: {r: 0.9, g: 0.98, b: 0.76, a: 1}
+  coldTint: {r: 0.06, g: 0.38, b: 0.3, a: 1}
+  bloomThreshold: 1.05
+  bloomIntensity: 0.22
+  bloomScatter: 0.32
+  bloomTint: {r: 0.55, g: 0.95, b: 0.68, a: 1}
+  applyPhase05SharedValues: 1
+  lightWrap: 0
+  phase05ShadowColor: {r: 0.045, g: 0.085, b: 0.065, a: 1}
+  ambientStrength: 0.18
+  specColor: {r: 0.1, g: 0.18, b: 0.14, a: 1}
+  specStrength: 0.025
+  specPower: 18
+  rampSteps: 4
+  rampStrength: 0.28
+  fogColor: {r: 0.004, g: 0.01, b: 0.008, a: 1}
+  fogStart: 2.2
+  fogEnd: 5.5
+  applyLightRoles: 1
+  lightRoles:
+  - roleName: TableWarmLight
+    setGameObjectActive: 1
+    active: 1
+    color: {r: 0.58, g: 0.9, b: 0.62, a: 1}
+    intensity: 30.1
+    range: 4.08
+    spotAngle: 60.77
+    shadows: 2
+    shadowStrength: 0.35
+  - roleName: TableWarmLight (1)
+    setGameObjectActive: 1
+    active: 1
+    color: {r: 0.5, g: 0.8, b: 0.56, a: 1}
+    intensity: 4.2
+    range: 2.08
+    spotAngle: 60.77
+    shadows: 2
+    shadowStrength: 0.25
+  - roleName: playerlight
+    setGameObjectActive: 1
+    active: 1
+    color: {r: 0.48, g: 0.82, b: 0.68, a: 1}
+    intensity: 10
+    range: 4.08
+    spotAngle: 60.77
+    shadows: 2
+    shadowStrength: 0.2
