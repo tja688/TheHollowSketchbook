@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public sealed class RetroFakeLitBatchReport
 {
@@ -359,6 +360,8 @@ public static class RetroFakeLitConversionService
             }
 
             renderer.sharedMaterials = sharedMaterials;
+            renderer.shadowCastingMode = ShadowCastingMode.On;
+            renderer.receiveShadows = true;
             EditorUtility.SetDirty(renderer);
             report.convertedRendererCount++;
             changedAnyRenderer = true;

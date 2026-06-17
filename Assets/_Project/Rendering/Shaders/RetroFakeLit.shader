@@ -43,7 +43,7 @@ Shader "CardDungeon/RetroFakeLit"
             #pragma fragment Frag
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
-            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -132,8 +132,21 @@ Shader "CardDungeon/RetroFakeLit"
                     Light light = GetAdditionalLight(lightIndex, positionWS);
                     half addNdotL = saturate(dot(normalWS, light.direction));
                     half addWrapped = saturate(lerp(addNdotL, addNdotL * 0.5h + 0.5h, _LightWrap));
-                    half addLit = QuantizeLight(addWrapped) * light.distanceAttenuation * light.shadowAttenuation;
-                    color += light.color * addLit;
+                    half addLit = QuantizeLight(addWrapped) * light.distanceAttenuation;
+                    half addShadow = light.shadowAttenuation;
+                    half3 addLightColor = lerp(_ShadowColor.rgb, light.color, addShadow);
+                    color += addLightColor * addLit * addShadow;
+                }
+                #elif defined(_ADDITIONAL_LIGHT_SHADOWS)
+                uint shadowLightCount = GetAdditionalLightsCount();
+                for (uint shadowLightIndex = 0u; shadowLightIndex < shadowLightCount; ++shadowLightIndex)
+                {
+                    Light light = GetAdditionalLight(shadowLightIndex, positionWS);
+                    half addNdotL = saturate(dot(normalWS, light.direction));
+                    half addWrapped = saturate(lerp(addNdotL, addNdotL * 0.5h + 0.5h, _LightWrap));
+                    half addLit = QuantizeLight(addWrapped) * light.distanceAttenuation;
+                    half addShadow = light.shadowAttenuation;
+                    color = lerp(color, _ShadowColor.rgb, (1.0h - addShadow) * addLit);
                 }
                 #endif
 

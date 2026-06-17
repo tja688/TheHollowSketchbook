@@ -5,6 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public static class RetroFakeLitMaterialConverter
 {
@@ -92,6 +93,8 @@ public static class RetroFakeLitMaterialConverter
                 continue;
 
             renderer.sharedMaterials = materials;
+            renderer.shadowCastingMode = ShadowCastingMode.On;
+            renderer.receiveShadows = true;
             EditorUtility.SetDirty(renderer);
             rendererCount++;
         }

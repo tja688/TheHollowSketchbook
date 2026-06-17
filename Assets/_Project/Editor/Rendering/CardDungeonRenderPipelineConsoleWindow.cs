@@ -456,7 +456,11 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 SetUrpBool("m_RequireDepthTexture", true, "Apply Depth Preset");
                 SetUrpBool("m_RequireOpaqueTexture", false, "Apply Opaque Preset");
                 SetUrpInt("m_AdditionalLightsPerObjectLimit", 4, "Apply Light Limit Preset");
+                SetUrpInt("m_AdditionalLightsRenderingMode", 2, "Apply Additional Lights Per Pixel Preset");
                 SetUrpFloat("m_ShadowDistance", 18f, "Apply Shadow Distance Preset");
+                SetUrpInt("m_MainLightShadowmapResolution", 512, "Apply Main Light Shadow Resolution Preset");
+                SetUrpFloat("m_ShadowDepthBias", 0.758f, "Apply Shadow Depth Bias Preset");
+                SetUrpFloat("m_ShadowNormalBias", 0.856f, "Apply Shadow Normal Bias Preset");
                 SetCompositeVirtualResolution(960, 540, 1f);
                 RefreshPage();
             })),
@@ -532,12 +536,98 @@ public sealed class CardDungeonRenderPipelineConsoleWindow : EditorWindow
                 () => GetUrpInt("m_AdditionalLightsPerObjectLimit"),
                 value => SetUrpInt("m_AdditionalLightsPerObjectLimit", value, "Change Additional Lights Limit")));
 
+            section.Add(CreatePopupIntControl(
+                "Additional Lights Mode",
+                "附加灯计算模式。桌面烛光阴影必须选 Per Pixel；Per Vertex 会让 Spot 阴影图采样不到，表现成“灯亮但桌面没影子”。",
+                () => GetUrpInt("m_AdditionalLightsRenderingMode"),
+                value => SetUrpInt("m_AdditionalLightsRenderingMode", value, "Change Additional Lights Mode"),
+                new[]
+                {
+                    new IntOption(0, "Disabled"),
+                    new IntOption(1, "Per Vertex (无 Spot 阴影)"),
+                    new IntOption(2, "Per Pixel (推荐)")
+                }));
+
             section.Add(CreateFloatControl(
                 "Shadow Distance",
                 "阴影绘制距离。调大：远处也有阴影，但更容易暴露现代 3D 感；调小：更像黑场吞细节。",
                 0f, 50f,
                 () => GetUrpFloat("m_ShadowDistance"),
                 value => SetUrpFloat("m_ShadowDistance", value, "Change Shadow Distance")));
+        }));
+
+        contentScroll.Add(CreateSectionCard("阴影 / Shadows", "先确认总开关，再看距离和分辨率，最后才动 Bias。不要把“没有阴影”和“阴影悬浮”混为一个问题。", section =>
+        {
+            section.Add(CreateToggleControl(
+                "Any Shadows",
+                "阴影总开关。关掉后所有实时阴影都会消失。",
+                () => GetUrpBool("m_AnyShadowsSupported"),
+                value => SetUrpBool("m_AnyShadowsSupported", value, "Toggle Any Shadows")));
+
+            section.Add(CreateToggleControl(
+                "Main Light Shadows",
+                "主方向光阴影。烛光场景建议保持开启，但把方向光强度压低，只留接触阴影。",
+                () => GetUrpBool("m_MainLightShadowsSupported"),
+                value => SetUrpBool("m_MainLightShadowsSupported", value, "Toggle Main Light Shadows")));
+
+            section.Add(CreateToggleControl(
+                "Additional Light Shadows",
+                "附加灯（Spot/Point）阴影。当前桌面烛光主要依赖这一项。",
+                () => GetUrpBool("m_AdditionalLightShadowsSupported"),
+                value => SetUrpBool("m_AdditionalLightShadowsSupported", value, "Toggle Additional Light Shadows")));
+
+            section.Add(CreateToggleControl(
+                "Local Shadows",
+                "本地灯阴影。一般保持开，和附加灯阴影一起服务桌面局部光。",
+                () => GetUrpBool("m_LocalShadowsSupported"),
+                value => SetUrpBool("m_LocalShadowsSupported", value, "Toggle Local Shadows")));
+
+            section.Add(CreateToggleControl(
+                "Soft Shadows",
+                "软阴影。开着更像烛光晕染；关掉边缘更硬、更复古。",
+                () => GetUrpBool("m_SoftShadowsSupported"),
+                value => SetUrpBool("m_SoftShadowsSupported", value, "Toggle Soft Shadows")));
+
+            section.Add(CreatePopupIntControl(
+                "Main Light Shadow Resolution",
+                "主光阴影贴图分辨率。512 足够 retro；过高会更清晰但也更现代。",
+                () => GetUrpInt("m_MainLightShadowmapResolution"),
+                value => SetUrpInt("m_MainLightShadowmapResolution", value, "Change Main Light Shadow Resolution"),
+                new[]
+                {
+                    new IntOption(256, "256"),
+                    new IntOption(512, "512"),
+                    new IntOption(1024, "1024"),
+                    new IntOption(2048, "2048"),
+                    new IntOption(4096, "4096")
+                }));
+
+            section.Add(CreatePopupIntControl(
+                "Additional Lights Shadow Atlas",
+                "附加灯阴影图集分辨率。桌面多盏 Spot 时，这个值太低会让阴影发糊或互相抢 atlas。",
+                () => GetUrpInt("m_AdditionalLightsShadowmapResolution"),
+                value => SetUrpInt("m_AdditionalLightsShadowmapResolution", value, "Change Additional Light Shadow Atlas"),
+                new[]
+                {
+                    new IntOption(512, "512"),
+                    new IntOption(1024, "1024"),
+                    new IntOption(2048, "2048"),
+                    new IntOption(4096, "4096")
+                }));
+
+            section.Add(CreateFloatControl(
+                "Depth Bias",
+                "深度偏移。阴影悬浮（Peter Panning）时增大；阴影断裂/闪烁时减小。",
+                0f, 3f,
+                () => GetUrpFloat("m_ShadowDepthBias"),
+                value => SetUrpFloat("m_ShadowDepthBias", value, "Change Shadow Depth Bias")));
+
+            section.Add(CreateFloatControl(
+                "Normal Bias",
+                "法线偏移。用于减少斜面阴影痤疮；过大时阴影会脱离物体。",
+                0f, 3f,
+                () => GetUrpFloat("m_ShadowNormalBias"),
+                value => SetUrpFloat("m_ShadowNormalBias", value, "Change Shadow Normal Bias")));
         }));
 
         contentScroll.Add(CreateSectionCard("AI 自动化调试可用性", "这里总结当前 AI/编辑器能安全直接操作的固定分辨率相关接线，方便后续维护时快速判断。", section =>
