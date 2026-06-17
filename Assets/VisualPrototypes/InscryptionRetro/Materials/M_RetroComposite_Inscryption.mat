@@ -46,6 +46,6 @@ Material:
     - _VirtualHeight: 1080
     - _VirtualWidth: 1920
     m_Colors:
-    - _ColdTint: {r: 0.12, g: 0.26, b: 0.23, a: 1}
-    - _WarmTint: {r: 1.06, g: 0.84, b: 0.58, a: 1}
+    - _ColdTint: {r: 0.11999995, g: 0.25999996, b: 0.22999996, a: 1}
+    - _WarmTint: {r: 1.06, g: 0.8399999, b: 0.58, a: 1}
   m_BuildTextureStacks: []
